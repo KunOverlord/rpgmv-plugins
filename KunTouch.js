@@ -4,7 +4,7 @@
 /*:
  * @plugindesc KunTouch
  * @filename KunTouch.js
- * @version 1.2
+ * @version 1.5
  * @author KUN
  * 
  * @help
@@ -48,6 +48,13 @@
  * @require 1
  * @dir audio/se/
  * 
+ * @param limitSfx
+ * @text Touch Limit SFX
+ * @desc Play this sound when the player exceeds the touchable slots per round
+ * @type file
+ * @require 1
+ * @dir audio/se/
+ * 
  * @param varX
  * @text Var ID X
  * @desc Variable id to bind the X position
@@ -67,7 +74,7 @@
  * @desc Define a limit for the touch cache
  * @type Number
  * @min 1
- * @max 8
+ * @max 16
  * @default 1
  * 
  * @param varCounter
@@ -79,8 +86,8 @@
  * @default 0
  * 
  * @param touchSwitch
- * @text Touch Switch
- * @desc Select the switch which will fire up the touch event while clicked
+ * @text Lock Touch Switch
+ * @desc Set this switch ON to avoid processing the touch events, for example with a menu transition.
  * @type Switch
  * @min 0
  * @default 0
@@ -170,6 +177,11 @@
  * @type Number
  * @min 0
  * 
+ * @param sfx
+ * @text Play SFX
+ * @type file
+ * @require 1
+ * @dir audio/se/
  * 
  */
 
@@ -192,12 +204,15 @@ function KunTouch() {
 
         'areas': { },
         'layer': 'default',
-        'media': '',
+        'touchFx': '',
+        'limitFx': '',
         'varX':0,
         'varY':0,
         'varCounter': 0,
         'limit': 1,
         'touched': [],
+        //use this flag to block access to the array while being edited by next
+        'locked':false,
         //'offset':{'x':0,'y':0,},
         'switchId': 0,
         'presets': {
@@ -208,7 +223,8 @@ function KunTouch() {
     this.Set = {
         'Debug': ( debug ) => _manager.debug = typeof debug === 'boolean' && debug || false,
         'Capture': (capture) => _manager.capture = typeof capture === 'boolean' && capture ||false,
-        'Media': ( media ) => _manager.media = media || '',
+        'TouchSFX': ( media ) => _manager.touchFx = media || '',
+        'LimitSFX': ( media ) => _manager.limitFx = media || '',
         'X': ( varId ) => _manager.varX = parseInt( varId ) || 0,
         'Y': ( varId ) => _manager.varY = parseInt( varId ) || 0,
         'Counter': (varId ) => _manager.varCounter = parseInt( varId ) || 0,
@@ -227,16 +243,18 @@ function KunTouch() {
      * @param {Array} areas 
      * @param {String} defaultLayer 
      * @param {String} sfx 
+     * @param {String[]} limit
      * @returns 
      */
-    this.createPreset = function( name , title, areas , defaultLayer , sfx ){
+    this.createPreset = function( name , title, areas , defaultLayer , sfx , limit ){
 
         if( areas && areas.length > 0 ){
             _manager.presets[name] = {
                 'name': name,
                 'title': Array.isArray( title ) ? title : [title],
                 'areas': areas,
-                //'sfx': sfx,
+                'sfx': sfx || '',
+                'limit': Array.isArray(limit) ? limit : [],
                 'layer': defaultLayer,
             };    
         }
@@ -249,7 +267,7 @@ function KunTouch() {
      */
     this.importPreset = function( name ){
         
-        this.clear();
+        this.clear(true);
         //console.log( _manager.presets );
         var preset = _manager.presets.hasOwnProperty( name ) ? _manager.presets[ name ] : null;
 
@@ -258,10 +276,10 @@ function KunTouch() {
             preset.areas.forEach( function( area ){
                 switch( area.type ){
                     case 'area':
-                        _self.area( area.name , area.varId , area.left , area.top , area.right , area.bottom , area.layer.join('.'));
+                        _self.area( area.name , area.varId , area.left , area.top , area.right , area.bottom , area.layer.join('.'), area.sfx );
                         break;
                     case 'rect':
-                        _self.rect( area.name , area.varId , area.left , area.top , area.right , area.bottom , area.layer.join('.'));
+                        _self.rect( area.name , area.varId , area.left , area.top , area.right , area.bottom , area.layer.join('.'), area.sfx);
                         break;
                 }
             });
@@ -272,9 +290,9 @@ function KunTouch() {
                 var selected  = preset.title.length > 1 ? preset.title[ Math.floor( Math.random(  ) * preset.title.length ) ] : preset.title[ 0 ];
                 KunTouch.Notify( selected.toString() );
             }
-            //if( preset.sfx ){
-                //this.playFx();
-            //}
+            if( preset.hasOwnProperty('sfx') ){
+                this.playFx(preset.sfx.length);
+            }
         }
         else{
             console.log( `Invalid Scene Preset ${name}`);
@@ -294,8 +312,17 @@ function KunTouch() {
      * @returns Boolean
      */
     this.locked = function(){
-        return _manager.switchId > 0 && $gameSwitches ? $gameSwitches.value( _manager.switchId ) : false;
+        // local locked flag is to block access to the list while being edited
+        return _manager.locked || (_manager.switchId > 0 && $gameSwitches ? $gameSwitches.value( _manager.switchId ) : false);
     };
+    /**
+     * @returns Number
+     */
+    this.limit = () => _manager.limit;
+    /**
+     * @returns Array
+     */
+    this.touched = () => _manager.touched;
     /**
      * @param {String} layer
      * @returns Array
@@ -381,13 +408,13 @@ function KunTouch() {
         return _scaleY < _scaleX ? _scaleY : _scaleX;
     };
     /**
-     * 
+     * @param {String} customSfx
      * @returns KunTouch
      */
-    this.playFx = function(){
-        if(  _manager.media.length ){
-            //_manager.media[ type ] = media;
-            AudioManager.playSe({name: _manager.media , pan: 0, pitch: 100, volume: 100});
+    this.playFx = function( customSfx ){
+        var _sfx = typeof customSfx === 'string' && customSfx.length > 0 ? customSfx : _manager.touchFx;
+        if(  _sfx.length ){
+            AudioManager.playSe({name: _sfx , pan: Math.floor(Math.random() * 20) - 10, pitch: 90 + Math.floor(Math.random() * 20), volume: 100});
         }
         return this;
     }
@@ -405,13 +432,15 @@ function KunTouch() {
     /**
      * @param {Number} x 
      * @param {Number} y 
+     * @param {Number} varId
      * @returns KunTouch
      */
-    this.enqueue = function(x , y ){
+    this.enqueue = function(x , y , varId ){
         if( _manager.touched.length < _manager.limit ){
             _manager.touched.push({
                 'x': x ,
                 'y': y,
+                'varId': varId || 0,
             })
             if( _manager.varCounter > 0 ){
                 $gameVariables.setValue( _manager.varCounter , _manager.touched.length );
@@ -434,23 +463,22 @@ function KunTouch() {
             //$gameVariables.setValue(_manager.varY , y - _manager.offset.y );
             $gameVariables.setValue(_manager.varY , y );
         }
-        if( _manager.debug ){
-            if( _manager.varX > 0 && _manager.varY > 0 ){
-                var x = $gameVariables.value( _manager.varX );
-                var y = $gameVariables.value( _manager.varY )
-                console.log( `Clicked on ${x},${y}` );    
-            }
-        }
         return this;
     };
 
     /**
+     * @param {Boolean} clearAll
      * @returns KunTouch
      */
-    this.clear = function(){
+    this.clear = function( clearAll ){
 
-        _manager.areas = {};
+        if( typeof clearAll === 'boolean' && clearAll ){
+            _manager.areas = {};
+        }
         _manager.touched = [];
+        if( _manager.varCounter > 0 ){
+            $gameVariables.setValue(_manager.varCounter , 0 );
+        }
 
         return this;
     };
@@ -465,29 +493,43 @@ function KunTouch() {
             var layer = this.currentLayer();
             var clicked = this.list( layer ).filter( area => area.collide(x,y) );
             if( clicked.length > 0 ){
-                if( this.enqueue( x , y ) ){
-                    //KUN.Touch.exportPosition( x , y ).switch().playFx();
-                    this.playFx();
+                if( this.enqueue( x , y , clicked[0].varId( ) ) ){
+                    this.playFx( clicked[0].sfx() );
+                    if( this.debug()){
+                        console.log( `Clicked spot ${clicked[0].name()}(${x} , ${y}) on layer ${layer} (${_manager.touched.length}/${_manager.limit})` );
+                    }
                     if( typeof next === 'boolean' && next ){
                         this.next();
                     }
-                    if( this.debug()){
-                        console.log( `clicked ${area.name()}(${x} , ${y}) on layer ${layer}` );
-                    }
                 } 
+                else{
+                    if( _manager.limitFx.length ){
+                        this.playFx( _manager.limitFx );
+                    }
+                }
             }
         }
     };
     /**
+     * @param {Boolean} random
      * @returns KunTouch
      */
-    this.next = function(){
+    this.next = function( random ){
         if( _manager.touched.length > 0 ){
-            var _spot = _manager.touched.shift();
+            _manager.locked = true;
+            var _spot = typeof random === 'boolean' && random && _manager.touched.length > 1 ?
+                _manager.touched.splice( Math.floor(Math.random() * _manager.touched.length),1) :
+                _manager.touched.shift();
+
+            //var _spot = _manager.touched.shift();
             this.exportPosition( _spot.x , _spot.y );
+            if( _spot.varId > 0 ){
+                $gameVariables.setValue( _spot.varId , $gameVariables.value( _spot.varId ) + 1);
+            }
             if( _manager.varCounter > 0 ){
                 $gameVariables.setValue( _manager.varCounter , _manager.touched.length );
-            }    
+            }
+            _manager.locked = false;
         }
         return this;
     };
@@ -500,22 +542,19 @@ function KunTouch() {
      * @param {Number} w 
      * @param {Number} h 
      * @param {String} layers
+     * @param {String} sfx
      * @returns 
      */
-    this.area = function( name , varId , x , y , w , h , layers ){
+    this.area = function( name , varId , x , y , w , h , layers , sfx ){
         
         name = name.toLowerCase().replace(/\-\s/,'_');
 
         if( !_manager.areas.hasOwnProperty(name)){
-                _manager.areas[ name ] = new KunEventArea( name , varId , x , y , w , h );
+                _manager.areas[ name ] = new KunEventArea( name , varId , x , y , w , h , sfx);
                 if( typeof layers === 'string' && layers.length > 0 ){
                     _manager.areas[ name ].addLayer( layers );
                 }
-                if( _manager.debug ){
-                    console.log( _manager.areas[ name ].data( ) );
-                }
         }
-        //_manager.areas.push( new KunEventArea( name , varId , x , y , w , h , b ) );
         return this;
     };
     /**
@@ -527,17 +566,17 @@ function KunTouch() {
      * @param {Number} bottomRight 
      * @param {Number} bottom 
      * @param {String} layers
+     * @param {String} sfx
      * @returns 
      */
-    this.rect = function( name , varId , topLeft , top , bottomRight , bottom , layers ){
+    this.rect = function( name , varId , topLeft , top , bottomRight , bottom , layers , sfx ){
         var x = topLeft;
         var y = top;
         var width = bottomRight - x;
         var height = bottom - top;
 
-        return this.area( name , varId , x , y , width, height , layers );
+        return this.area( name , varId , x , y , width, height , layers , sfx );
     }
-   
 
     return this;
 }
@@ -564,11 +603,13 @@ KunTouch.Notify = function( message ){
  * @param {Number} y 
  * @param {Number} width 
  * @param {Number} height 
+ * @param {String} sfx
  */
-function KunEventArea( name , varId , x , y , width , height ){
+function KunEventArea( name , varId , x , y , width , height , sfx ){
 
     var _area = {
         'name': name ,
+        'sfx': sfx || '',
         'varId': varId,
         'width': width || 1,
         'height': height || 1,
@@ -583,6 +624,11 @@ function KunEventArea( name , varId , x , y , width , height ){
     this.right = () => _area.x + _area.width;
     this.layers = () => _area.layers;
     this.isEmpty = () => _area.layers.length  === 0;
+    this.varId = () => _area.varId;
+    /**
+     * @returns String
+     */
+    this.sfx = () => _area.sfx;
     /**
      * @param {String} layer 
      * @returns Boolean
@@ -616,16 +662,11 @@ function KunEventArea( name , varId , x , y , width , height ){
      * @returns 
      */
     this.collide = function( x , y ){
-
         if( x >= this.left() && x <= this.right()){
             if( y >= this.top() && y <= this.bottom() ){
-                
-                this.update();
-
                 return true;
             }
         }
-
         return false;
     };
     /**
@@ -664,8 +705,11 @@ function KunTouchEventSetup(){
             }
         }
     };
-
-
+}
+/**
+ * 
+ */
+function KunTouch_PluginCommand( ){
     var _KunTouch_PluginCommand = Game_Interpreter.prototype.pluginCommand;
     Game_Interpreter.prototype.pluginCommand = function(command, args) {
         _KunTouch_PluginCommand.call(this, command, args);
@@ -675,15 +719,13 @@ function KunTouchEventSetup(){
                         case 'preset':
                             if( args.length > 1 ){
                                 KUN.Touch.importPreset( args[1] );
-                                console.log( KUN.Touch.list() );
                             }
                             break;
                         case 'layer':
                             KUN.Touch.setLayer( args.length > 1 ? args[1] : '' );
                             break;
-                        //case 'update':
                         case 'next':
-                            KUN.Touch.next();
+                            KUN.Touch.next( args.left > 2 && args[2] === 'random' );
                             break;
                         case 'limit':
                             if( args.length > 1 ){
@@ -709,7 +751,14 @@ function KunTouchEventSetup(){
                             }
                             break;
                         case 'clear':
-                            KUN.Touch.clear();
+                            if( args.length > 1 ){
+                                if(  args[1] === 'queue'){
+                                    KUN.Touch.clear();
+                                }
+                            }
+                            else{
+                                KUN.Touch.clear(true);
+                            }
                             break;
                         default:
                             if( args.length > 5 ){
@@ -729,7 +778,6 @@ function KunTouchEventSetup(){
             };
     };
 }
-
 function KunTouchImportPresets( scenes ){
 
     var _output = [];
@@ -738,7 +786,7 @@ function KunTouchImportPresets( scenes ){
         var _scene = {
             'name': preset.name.toLowerCase().replace(/([\s\_]+)/g,'-'),
             'title': preset.showTitle.length > 0 ? JSON.parse( preset.showTitle ) : [] ,
-            //'sfx': preset.sfx,
+            'sfx': preset.sfx || '',
             'layer': preset.layer || '',
             'spots': [],
         };
@@ -755,6 +803,7 @@ function KunTouchImportPresets( scenes ){
                 'top': parseInt( area.top ),
                 'right': parseInt( area.right ),
                 'bottom': parseInt( area.bottom ),
+                'sfx': area.sfx || '',
             } );
         });
 
@@ -777,16 +826,18 @@ function KunTouchImportPresets( scenes ){
     var parameters = PluginManager.parameters('KunTouch');
     KUN.Touch = new KunTouch();
     KUN.Touch.Set.Debug( parameters.debug === 'true' );
-    KUN.Touch.Set.Media( parameters.touchSfx );
+    KUN.Touch.Set.TouchSFX( parameters.touchSfx );
+    KUN.Touch.Set.LimitSFX( parameters.limitSfx );
     KUN.Touch.Set.X( parameters.varX );
     KUN.Touch.Set.Y( parameters.varY );
     KUN.Touch.Set.Counter( parameters.varCounter );
-    KUN.Touch.Set.Limit( parameters.limit );
+    KUN.Touch.Set.Limit( parameters.touchLimit );
     KUN.Touch.Set.Switch( parameters.touchSwitch );
     
-    KunTouchImportPresets( parameters.scenePresets || '' ).forEach( preset =>  KUN.Touch.createPreset( preset.name, preset.title, preset.spots, preset.layer ) );
+    KunTouchImportPresets( parameters.scenePresets || '' ).forEach( preset =>  KUN.Touch.createPreset( preset.name, preset.title, preset.spots, preset.layer , preset.sfx ) );
 
     KunTouchEventSetup();
+    KunTouch_PluginCommand();
     //SceneManager._screenWidth;
     //SceneManager._screenHeight;
     //window.innerWidth;
