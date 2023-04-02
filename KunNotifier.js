@@ -5,7 +5,7 @@
  * @plugindesc KunNotifier
  * @filename KunNotifier.js
  * @author KUN
- * @version 1.63
+ * @version 1.65
  * 
  * @param debug
  * @text Debug
@@ -51,6 +51,20 @@
  * @type file
  * @require 1
  * @dir audio/se/
+ * 
+ * @param notifyItem
+ * @text Notify Item
+ * @desc Notify when you get an item
+ * @type boolean
+ * @desc Show a notification when getting items
+ * @default false
+ * 
+ * @param itemText
+ * @parent notifyItem
+ * @desc Show this text when getting an item
+ * @text Item Text
+ * @type String
+ * @default You've got
  * 
  * @help
  * 
@@ -101,6 +115,8 @@ function KunNotifier() {
         'background': 0,
         'timeout': 0,
         'sfx': '',
+        'notifyItem':false,
+        'itemText': '',
         'window': null,
     };
 
@@ -111,6 +127,8 @@ function KunNotifier() {
         'Background': function (bg) { _notifier.background = parseInt(bg); },
         'Sound': function (se) { _notifier.sfx = se },
         'Position': ( pos )  => _notifier.position.y = parseInt(pos) || 1,
+        'NotifyItem': ( onItem ) => _notifier.notifyItem = typeof onItem === 'boolean' && onItem,
+        'ItemText': ( text ) => _notifier.itemText = text || '',
     };
     /**
      * @returns Boolean
@@ -188,6 +206,26 @@ function KunNotifier() {
         }
         return this;
     };
+    /**
+     * @param {String} item_name 
+     * @param {Number} amount 
+     * @param {Number} icon 
+     * @returns KunNotifier
+     */
+    this.onGetItem = function( item_name , amount , icon ){
+
+        var text = `${_notifier.itemText} ${item_name}`;
+        //console.log( amount );
+        if( typeof amount === 'number' && amount > 1 ){
+            text += ` (${amount})`;
+        }
+
+        if( typeof icon === 'number' && icon > 0 ){
+            text = `\\I[${icon}] ${text}`;
+        } 
+
+        return this.send( text , true );
+    };
 
     return this;
 }
@@ -237,6 +275,25 @@ KunNotifier.Parameters = function (input, value) {
     return typeof parameters === 'object' && parameters.hasOwnProperty(input) ?
         parameters[input] :
         typeof value !== 'undefined' ? value : '';
+};
+/**
+ * Override the add item command to display a notification
+ */
+KunNotifier.SetupGetItem = function(){
+    // Change Items
+    Game_Interpreter.prototype.command126 = function () {
+        var amount = this.operateValue(this._params[1], this._params[2], this._params[3]);
+        var item = $dataItems[this._params[0]];
+        if( item !== null ){
+            $gameParty.gainItem(item, amount );
+            if( amount > 0 ){
+                KunNotifier.MailBox.onGetItem(item.name, amount, item.iconIndex );
+            }
+            return true;
+    
+        }
+        return false;
+    };
 };
 
 /********************************************************************************************************************
@@ -399,6 +456,7 @@ Window_Notifier.prototype.push = function( message , playFx ){
         });
     }
 };
+
 /**
  * 
  * @returns Window_Notifier
@@ -440,6 +498,11 @@ function kun_notify (message , playSfx ) {
     KunNotifier.MailBox.Set.Background( parameters.background );
     KunNotifier.MailBox.Set.Sound( parameters.sfx );
     KunNotifier.MailBox.Set.Position( parameters.position );
+
+    if( parameters.notifyItem === 'true' ){
+        KunNotifier.SetupGetItem();
+        KunNotifier.MailBox.Set.ItemText( parameters.itemText );
+    }
 
     //OVERRIDE COMMAND INTERPRETER
     var KunNotifierPluginCommand = Game_Interpreter.prototype.pluginCommand;
