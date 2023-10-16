@@ -4,9 +4,9 @@
 /*:
  * @filename KunAnimations.js
  * @plugindesc Kun Interactive Picture Animations - Animate pictures with custom framesets and commands, now featuring an interactive framework to click over specific hotspots depending on the frameset running.
- * @version 1.84
- * @author KUN
- * @target MC | MZ
+ * @version 1.81
+ * @author KUN Overlord
+ * @target MZ
  * 
  * @help
  * 
@@ -109,8 +109,16 @@
  * @param touchMode
  * @parent touchVar
  * @text Touch Mode Switch
- * @desc Use it to keep control of the interactive mode in the event editor. Use KunAnimations mode touch | disable to change it.
+ * @desc Use it to track if the interactive mode is enabled. Use KunAnimations mode touch|disable to change it.
  * @type switch
+ * @default 0
+ * 
+ * @param touchWait
+ * @parent touchVar
+ * @text Touch Wait
+ * @desc how many frames to wait until the touch effect is fired
+ * @type number
+ * @min 0
  * @default 0
  * 
  * @param touchX
@@ -152,9 +160,9 @@
 /*~struct~Controller:
  *
  * @param source
- * @text Source Picture Pack
- * @desc Add one or more source pictures with the same frameset columns and rows, to use with the same animation rules. Duplicated pictures will be discarded.
- * @type file[]
+ * @text Bitmap Source
+ * @desc SpriteSheet
+ * @type file
  * @required 1
  * @dir img/pictures/
  * 
@@ -189,7 +197,7 @@
  * 
  * @param name
  * @text Name
- * @type text
+ * @type string
  * @default new-frameset
  * 
  * @param frames
@@ -248,7 +256,7 @@
  * @param bank
  * @text Sound Bank
  * @desc Type in a defined sound bank name to play a special sound set each time this frameset is started.
- * @type text[]
+ * @type string[]
  * @default []
  * 
  */
@@ -256,7 +264,7 @@
  * 
  * @param name
  * @text Name
- * @type text
+ * @type string
  * @default touch-me-here
  * 
  * @param x1
@@ -366,7 +374,7 @@
  * @default 100
  * 
  * @param sfx
- * @text Sound Effect Collection
+ * @text Sound Effect
  * @type file[]
  * @desc Add a selection of sound effects to play in this sound bank
  * @require 1
@@ -399,7 +407,7 @@
  * @param interrupt
  * @text Interrupt other SE
  * @desc Stop playing other Sound Effects when this bank plays a selection
- * @type boolean
+ * @type Boolean
  * @default false
  *
  */
@@ -432,6 +440,7 @@ KunSceneManager.Initialize = function(){
     this._touchMode = parseInt(parameters.touchMode || 0 );
     this._varX = parseInt(parameters.touchX || 0 );
     this._varY = parseInt(parameters.touchY || 0 );
+    this._touchWait = parseInt(parameters.touchWait || 0 );
     this._sfx = {
         'touch': parameters.touchSfx || '',
         'cancel': parameters.cancelSfx || '',
@@ -440,15 +449,15 @@ KunSceneManager.Initialize = function(){
 
     this._mode = KunSceneManager.Mode().Disabled;
     this._soundBanks = {};
-    this._scenes = {};
-    //this._overrides = {};
+    this._controllers = {};
+    this._overrides = {};
     this._alias = {};
     this._targets = [];
 
     var framesets = parameters.controllers.length > 0 ? JSON.parse(parameters.controllers ) : [];
     var banks = parameters.soundBank.length > 0 ? JSON.parse(parameters.soundBank) : [];
 
-    return this.ImportScenes( framesets ).ImportSoundBanks( banks );
+    return this.ImportFrameSets( framesets ).ImportBanks( banks );
 };
 /**
  * @returns Object
@@ -519,6 +528,12 @@ KunSceneManager.DebugMode = function(){
     KunSceneManager.setAlias = function( alias , original ){
         this._alias[alias] = original;
         return this;
+    };
+    /**
+     * @returns Number
+     */
+    KunSceneManager.elapsed = function( inMs ){
+        return typeof inMs === 'boolean' && inMs ? this._touchWait * 1000 : this._touchWait;
     };
     /**
      * @param {String} alias 
@@ -682,7 +697,7 @@ KunSceneManager.DebugMode = function(){
                         if( target !== null ){
                             target.update();
                             //export X and Y positions
-                            this.exportPosition( spot.x , spot.y );
+                            this.exportPosition( spot.x , spot.y ).wait();
                             //jump to next frameset (if any)
                             controller.changeFrameSet( target.next() , true );
                         }
@@ -696,6 +711,14 @@ KunSceneManager.DebugMode = function(){
             }
         }    
         return this.updateTouchPoints(this.countTargets());
+    };
+    /**
+     * 
+     * @returns KunSceneManager
+     */
+    KunSceneManager.wait = function(){
+        for( var t = 0 ; t < this.elapsed(true) ; t++ );
+        return this;
     };
     /**
      * @param {Number} x 
@@ -751,9 +774,9 @@ KunSceneManager.DebugMode = function(){
      * @param {KunAnimationScene} controller 
      * @returns KunSceneManager
      */
-    KunSceneManager.addScene = function( controller ){
+    KunSceneManager.addController = function( controller ){
         if( controller instanceof KunAnimationScene && !this.has(controller.name()) ){
-            this._scenes[controller.name()] = controller;
+            this._controllers[controller.name()] = controller;
         }
         return this;
     };
@@ -762,7 +785,7 @@ KunSceneManager.DebugMode = function(){
      * @returns Boolean
      */
     KunSceneManager.has = function( name ){
-        return this._scenes.hasOwnProperty( name );
+        return this._controllers.hasOwnProperty( name );
     }
     /**
      * @param {String} name 
@@ -775,14 +798,14 @@ KunSceneManager.DebugMode = function(){
      * @returns Array
      */
     KunSceneManager.controllers = function( list ){
-        return typeof list === 'boolean' && list ? Object.values( this._scenes ) : this._scenes;
+        return typeof list === 'boolean' && list ? Object.values( this._controllers ) : this._controllers;
     };
     /**
      * @param {String} pictureName 
      * @returns {KunAnimationScene}
      */
     KunSceneManager.get = function( pictureName ){
-        return this.has( pictureName ) ? this._scenes[pictureName] : null;
+        return this.has( pictureName ) ? this._controllers[pictureName] : null;
     }
     /**
      * @param {String} pictureName 
@@ -818,7 +841,7 @@ KunSceneManager.DebugMode = function(){
     KunSceneManager.overrideSet = function( pictureName , frameSetName ){
 
         if( this.isPlaying( pictureName)){
-            this._scenes[ pictureName ].changeFrameSet(frameSetName, true ) ;
+            this._controllers[ pictureName ].changeFrameSet(frameSetName, true ) ;
             this.updateTouchPoints(this.countTargets());
         }
 
@@ -832,7 +855,7 @@ KunSceneManager.DebugMode = function(){
      */
     KunSceneManager.overrideFPS = function( pictureName , fps ){
         if( this.isPlaying( pictureName ) ){
-            this._scenes[ pictureName ].setFps( fps );
+            this._controllers[ pictureName ].setFps( fps );
         }
         return this;
     };
@@ -854,7 +877,7 @@ KunSceneManager.PluginParameters = function(){
  * @param {Object[]} input 
  * @returns KunSceneManager
  */
-KunSceneManager.ImportScenes = function( input ){
+KunSceneManager.ImportFrameSets = function( input ){
 
     var _spotCounter = 0;
     var _layerCounter = 0;
@@ -862,15 +885,8 @@ KunSceneManager.ImportScenes = function( input ){
 
     ( input ).map( ctl => ctl.length > 0 ? JSON.parse( ctl ) : null ).forEach(function( ctl ){
         if( ctl !== null ){
-
-            var _controllers = typeof ctl.source === 'string' && ctl.source.length > 0 ?  (/^\[.*\]$/.test(ctl.source) ? JSON.parse(ctl.source) : [ctl.source])   : [];
-            var _scenes = [];
-
-            //Match fix to the next update and backwards compatibility with a single string value
-            _controllers.forEach( function( source ){
-                _scenes.push( new KunAnimationScene( source, parseInt(ctl.cols), parseInt(ctl.rows), parseInt(ctl.fps || 0)));
-            });
-            
+            _pictureCounter++;
+            var _controller = new KunAnimationScene(ctl.source,parseInt(ctl.cols),parseInt(ctl.rows),parseInt(ctl.fps || 0));
             var _framesets = ctl.framesets.length > 0 ? JSON.parse(ctl.framesets) : [];
             ( _framesets ).map( fs => fs.length > 0 ? JSON.parse(fs) : null ).forEach(function(fs){
                 if( fs !== null ){
@@ -912,18 +928,14 @@ KunSceneManager.ImportScenes = function( input ){
                     //KunSceneManager.DebugLog( _frameSet.spots() );
 
                     if( _frameSet.count() > 0 ){
-                        _scenes.forEach( function( scene ){
-                            scene.add( _frameSet );
-                        } );
+                        _controller.add( _frameSet );
                     }
                 }
             });
 
-            _scenes.forEach( function( scene ){
-                if( scene.countFrames() ){
-                    KunSceneManager.addScene( scene );
-                }
-            });
+            if( _controller.countFrames() ){
+                KunSceneManager.addController( _controller );
+            }
         }
     });
                     //leave this here for debugging.
@@ -937,7 +949,7 @@ KunSceneManager.ImportScenes = function( input ){
  * @param {Object[]} input 
  * @returns KunSceneManager
  */
-KunSceneManager.ImportSoundBanks = function( input ){
+KunSceneManager.ImportBanks = function( input ){
     (input).map( sb => sb.length > 0 ? JSON.parse( sb ) : null ).forEach( function( bank ){
         var sb = new KunSoundBank( bank.name , bank.chance , bank.interrupt === 'true' , parseInt( bank.round  ||  0 ) );
         (bank.pitch.length > 0 ? JSON.parse(bank.pitch) : []).map(pitch => parseInt( pitch )).forEach(function( pitch ){
@@ -1049,6 +1061,16 @@ KunAnimationScene.prototype.toString = function(){ return this.name(); };
  * @returns String
  */
 KunAnimationScene.prototype.name = function(){ return this._name; };
+/**
+ * 
+ * @param {String} name 
+ * @returns KunAnimationScene
+ */
+KunAnimationScene.prototype.duplicate = function( name ){
+    var _copy = { ...this };
+    _copy._name = name;
+    return _copy;
+};
 /**
  * @returns KunAnimationLayer
  */

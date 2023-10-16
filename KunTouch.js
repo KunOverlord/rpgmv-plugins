@@ -4,7 +4,7 @@
 /*:
  * @plugindesc KunTouch
  * @filename KunTouch.js
- * @version 1.5
+ * @version 1.6
  * @author KUN
  * 
  * @help
@@ -144,6 +144,18 @@
  * @min 0
  * @default 0
  * 
+ * @param behaviour
+ * @text Behaviour
+ * @desc Define the area interaction behaviour
+ * @type Select
+ * @option Interactive
+ * @value interactive
+ * @option User Control
+ * @value control
+ * @option None
+ * @value none
+ * @default interactive
+ * 
  * @param type
  * @text Area Type
  * @type Select
@@ -235,7 +247,7 @@ function KunTouch() {
     /**
      * @returns Array
      */
-    this.listPresets = () => Object.values( _manager.presets );
+    this.presets = ( list ) => typeof list ==='boolean' && list ? Object.values( _manager.presets ) : _manager.presets;
     /**
      * 
      * @param {String} name 
@@ -276,20 +288,20 @@ function KunTouch() {
             preset.areas.forEach( function( area ){
                 switch( area.type ){
                     case 'area':
-                        _self.area( area.name , area.varId , area.left , area.top , area.right , area.bottom , area.layer.join('.'), area.sfx );
+                        _self.area( area.name , area.varId , area.left , area.top , area.right , area.bottom , area.layer.join('.'), area.sfx , area.behaviour );
                         break;
                     case 'rect':
-                        _self.rect( area.name , area.varId , area.left , area.top , area.right , area.bottom , area.layer.join('.'), area.sfx);
+                        _self.rect( area.name , area.varId , area.left , area.top , area.right , area.bottom , area.layer.join('.'), area.sfx, area.behaviour );
                         break;
                 }
             });
             //default layer
             this.setLayer( preset.layer );
-            if( preset.title.length ){
+            /*if( preset.title.length ){
                 //show title
                 var selected  = preset.title.length > 1 ? preset.title[ Math.floor( Math.random(  ) * preset.title.length ) ] : preset.title[ 0 ];
                 KunTouch.Notify( selected.toString() );
-            }
+            }*/
             if( preset.hasOwnProperty('sfx') ){
                 this.playFx(preset.sfx.length);
             }
@@ -493,19 +505,27 @@ function KunTouch() {
             var layer = this.currentLayer();
             var clicked = this.list( layer ).filter( area => area.collide(x,y) );
             if( clicked.length > 0 ){
-                if( this.enqueue( x , y , clicked[0].varId( ) ) ){
-                    this.playFx( clicked[0].sfx() );
-                    if( this.debug()){
-                        console.log( `Clicked spot ${clicked[0].name()}(${x} , ${y}) on layer ${layer} (${_manager.touched.length}/${_manager.limit})` );
-                    }
-                    if( typeof next === 'boolean' && next ){
-                        this.next();
-                    }
-                } 
-                else{
-                    if( _manager.limitFx.length ){
-                        this.playFx( _manager.limitFx );
-                    }
+                if( this.debug()){
+                    console.log( `Touched spot ${clicked[0].name()}(${x} , ${y}) on layer ${layer} (${clicked[0].behaviour()})` );
+                }
+                switch( clicked[0].behaviour() ){
+                    case KunEventArea.Behaviour.Interactive:
+                        if( this.enqueue( x , y , clicked[0].varId( ) ) ){
+                            this.playFx( clicked[0].sfx() );
+                            if( typeof next === 'boolean' && next ){
+                                this.next();
+                            }
+                        } 
+                        else{
+                            if( _manager.limitFx.length ){
+                                this.playFx( _manager.limitFx );
+                            }
+                        }
+                        break;
+                    case KunEventArea.Behaviour.UserControl:
+                        clicked[0].update();
+                        this.playFx( clicked[0].sfx() );
+                        break;
                 }
             }
         }
@@ -543,14 +563,15 @@ function KunTouch() {
      * @param {Number} h 
      * @param {String} layers
      * @param {String} sfx
-     * @returns 
+     * @param {String} behaviour
+     * @returns KunTouch
      */
-    this.area = function( name , varId , x , y , w , h , layers , sfx ){
+    this.area = function( name , varId , x , y , w , h , layers , sfx , behaviour ){
         
         name = name.toLowerCase().replace(/\-\s/,'_');
 
         if( !_manager.areas.hasOwnProperty(name)){
-                _manager.areas[ name ] = new KunEventArea( name , varId , x , y , w , h , sfx);
+                _manager.areas[ name ] = new KunEventArea( name , varId , x , y , w , h , sfx , behaviour || KunEventArea.Behaviour.Interactive );
                 if( typeof layers === 'string' && layers.length > 0 ){
                     _manager.areas[ name ].addLayer( layers );
                 }
@@ -567,15 +588,16 @@ function KunTouch() {
      * @param {Number} bottom 
      * @param {String} layers
      * @param {String} sfx
-     * @returns 
+     * @param {String} behaviour
+     * @returns KunTouch
      */
-    this.rect = function( name , varId , topLeft , top , bottomRight , bottom , layers , sfx ){
+    this.rect = function( name , varId , topLeft , top , bottomRight , bottom , layers , sfx ,behaviour){
         var x = topLeft;
         var y = top;
         var width = bottomRight - x;
         var height = bottom - top;
 
-        return this.area( name , varId , x , y , width, height , layers , sfx );
+        return this.area( name , varId , x , y , width, height , layers , sfx , behaviour );
     }
 
     return this;
@@ -604,8 +626,9 @@ KunTouch.Notify = function( message ){
  * @param {Number} width 
  * @param {Number} height 
  * @param {String} sfx
+ * @param {String} behaviour
  */
-function KunEventArea( name , varId , x , y , width , height , sfx ){
+function KunEventArea( name , varId , x , y , width , height , sfx , behaviour ){
 
     var _area = {
         'name': name ,
@@ -616,6 +639,7 @@ function KunEventArea( name , varId , x , y , width , height , sfx ){
         'layers':[],
         'x': x || 0,
         'y': y || 0,
+        'behaviour': behaviour || KunEventArea.Behaviour.Interactive,
     };
     this.name = () => _area.name;
     this.left = () => _area.x;
@@ -625,6 +649,19 @@ function KunEventArea( name , varId , x , y , width , height , sfx ){
     this.layers = () => _area.layers;
     this.isEmpty = () => _area.layers.length  === 0;
     this.varId = () => _area.varId;
+    this.behaviour = () => _area.behaviour;
+    /**
+     * @returns Boolean
+     */
+    this.canTouch = function(){
+        return this.behaviour() === KunEventArea.Behaviour.Interactive;
+    };
+    /**
+     * @returns Boolean
+     */
+    this.isUI = function(){
+        return this.behaviour() === KunEventArea.Behaviour.UserControl;
+    };
     /**
      * @returns String
      */
@@ -650,9 +687,7 @@ function KunEventArea( name , varId , x , y , width , height , sfx ){
      * @returns KunEventArea
      */
     this.update = function(){
-        var value = $gameVariables.value( _area.varId );
-        value++;
-        $gameVariables.setValue( _area.varId , value );
+        $gameVariables.setValue( _area.varId , $gameVariables.value( _area.varId ) + 1 );
         return this;
     };
 
@@ -674,7 +709,14 @@ function KunEventArea( name , varId , x , y , width , height , sfx ){
      */
     this.data = () => _area;
 }
-
+/**
+ * 
+ */
+KunEventArea.Behaviour = {
+    'None': 'none',
+    'Interactive': 'interactive',
+    'UserControl': 'control',
+};
 /**
  * 
  */
@@ -804,6 +846,7 @@ function KunTouchImportPresets( scenes ){
                 'right': parseInt( area.right ),
                 'bottom': parseInt( area.bottom ),
                 'sfx': area.sfx || '',
+                'behaviour': area.behaviour || KunEventArea.Behaviour.Interactive,
             } );
         });
 

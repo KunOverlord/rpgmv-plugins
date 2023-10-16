@@ -5,27 +5,33 @@
  * @plugindesc Kun Special Attributes
  * @filename KunAttributes.js
  * @author Kun
- * @version 1.5
+ * @version 1.54
  * 
  * @help
  * 
  * COMMANDS
  * 
- *      KunAttributes reset [actor_id] [gauge_name]
+ *      KunAttributes reset [actor_id] [attribute_name]
  *          Resets acgor's gauge to the original value
  * 
- *      KunAttributes set [actor_id] [gauge_name] [amount] [import]
+ *      KunAttributes set [actor_id] [attribute_name] [amount] [import]
  *          Sets actor's gauge_name the provided amount. Use import to use a gameVariable value
  * 
- *      KunAttributes add [actor_id] [gauge_name] [amount] [import]
+ *      KunAttributes add [actor_id] [attribute_name] [amount] [import]
  *          Adds actor's gauge_name the provided amount. Use import to use a gameVariable value
  * 
- *      KunAttributes sub [actor_id] [gauge_name] [amount] [import]
+ *      KunAttributes sub [actor_id] [attribute_name] [amount] [import]
  *          Substract actor's gauge_name the provided amount. Use import to use a gameVariable value
  * 
- *      KunAttributes export [actor_id] [gauge_name] [export_var] [export_max_var]
- *          Export actor_id attribute current value into export_var
- *          Export actor_id max attribute value using export_max_var
+ *      KunAttributes maximum [actor_id] [attribute_name] [maximum] [import]
+ *          Sets the maximum range of the selected attribute and updates the current value if required to fit the new range.
+ * 
+ *      KunAttributes progress [actor_id] [attribute_name] [exportVar]
+ *          Exports the selected attribute's percentage value into a Game Variable [exportVar]
+ * 
+ *      KunAttributes export [actor_id] [attribute_name] [value_var] [maximum_var]
+ *          Export actor_id attribute current value into value_var
+ *          Export actor_id max attribute value using maximum_var
  * 
  *
  * @param debug
@@ -53,7 +59,7 @@
  * 
  * @param icon
  * @text Icon
- * @type Number
+ * @type number
  * @min 0
  * @default 0
  *
@@ -73,26 +79,40 @@
  * 
  * @param maximum
  * @text Maximum
- * @type Number
+ * @type number
  * @min 1
  * @default 100
  * 
+ * @param maxVar
+ * @text Maximum Variable ID
+ * @parent maximum
+ * @type variable
+ * @min 0
+ * @default 0
+ * 
  * @param value
  * @text Default Value
- * @type Number
+ * @type number
+ * @min 0
+ * @default 0
+ * 
+ * @param valueVar
+ * @parent value
+ * @text Value Variable ID
+ * @type variable
  * @min 0
  * @default 0
  * 
  * @param color1
  * @text Base Color
- * @type Number
+ * @type number
  * @min 0
  * @max 32
  * @default 2
  * 
  * @param color2
  * @text Overlay Color
- * @type Number
+ * @type number
  * @min 0
  * @max 32
  * @default 5
@@ -100,7 +120,7 @@
  * @param actors
  * @text Actors
  * @desc List all exclusive actors who wanna use this attribute ;)
- * @type Actor[]
+ * @type actor[]
  * 
  */
 
@@ -111,16 +131,41 @@
 var KUN = KUN || {};
 
 function KunAttributes(){
+    throw `${this.constructor.name} is a Static Class`;
+};
+/**
+ * 
+ * @returns KunAttributes
+ */
+KunAttributes.Initialize = function( ){
 
-    var _controller = {
-        'debug': false,
-        'attributes': {/* list attributes here */}
+    var _parameters = PluginManager.parameters('KunAttributes');
+
+    this._debug = _parameters.debug === 'true';
+    
+    this._attributes = {
+        //list attribute definition here
     };
+
+    return this.Import( _parameters.attributes.length > 0 ? JSON.parse(_parameters.attributes ) : [] );
+}
+
     /**
      * @returns Boolean
      */
-    this.debug = () => _controller.debug;
+    KunAttributes.debug = function(){
+        return this._debug;
+    }
     /**
+     * @param {String} attribute 
+     * @returns Boolean
+     */
+    KunAttributes.has = function( attribute ){
+        return typeof attribute === 'string' && attribute.length > 0 && this._attributes.hasOwnProperty( attribute );
+    };
+
+    /**
+     * @param {String} name 
      * @param {String} title 
      * @param {String} display 
      * @param {Number} max 
@@ -131,70 +176,70 @@ function KunAttributes(){
      * @param {Number[]} actors
      * @returns 
      */
-    this.add = function( title, display, max , value , icon , color1 , color2 , actors ){
+    KunAttributes.add = function( name ,title, display, max , value , icon , color1 , color2 , actors ){
         //var name = title.toLowerCase().replace(' ','_');
-        var name = KunAttribute.ParseName( title );
+        //var name = KunAttribute.ParseName( title );
 
-        _controller.attributes[ name ] = new KunAttribute( name , title , display , max , value , icon , color1 , color2, actors );
-
+        if( !this.has( name ) ){
+            this._attributes[ name ] = new KunAttribute( name , title , display , max , value , icon , color1 , color2, actors );
+        }
+        
         return this;
     };
 
-    this.Set = {
-        'Debug': ( debug ) => _controller.debug = typeof debug === 'boolean' && debug,
-    };
-    /**
-     * @param {Number} actor_id (optional) Fitler by Actor ID
-     * @param {Boolean} showAll show all hidden attributes
-     * @returns Array|Object
-     */
-    /*this.attributes = function( actor_id , showAll ){
-        showAll = typeof showAll === 'boolean' && showAll;
-        var list = Object.values( _controller.attributes );
-        return ( typeof actor_id ==='number' ) ?
-            list.filter( item => item.available( actor_id ) && ( item.display !== KunAttributes.DisplayType.NONE || showAll ) ) :
-            list.filter( item => item.display !== KunAttributes.DisplayType.NONE || showAll );
-    };*/
     /**
      * List all attributes by actor
      * @param {Number} actor_id 
      * @param {Boolean} showAll 
      * @returns Array
      */
-    this.actorAttributes = function( actor_id , showAll ){
+    KunAttributes.actorAttributes = function( actor_id , showAll ){
         showAll = typeof showAll === 'boolean' && showAll;
         return this.attributes( true ).filter( item => item.available(actor_id) && ( showAll || item.display !== KunAttributes.DisplayType.NONE ) );
+    };
+    /**
+     * @param {Number} actor_id 
+     * @param {Boolean} countAll 
+     * @returns Number
+     */
+    KunAttributes.countAttributes = function( actor_id , countAll ){
+        return this.actorAttributes( actor_id , countAll ).length;
     };
     /**
      * @param {Boolean} list 
      * @returns Object|Array
      */
-    this.attributes = function( list ){
-        return typeof list === 'boolean' && list ? Object.values(_controller.attributes ) : _controller.attributes;
+    KunAttributes.attributes = function( list ){
+        return typeof list === 'boolean' && list ? Object.values(this._attributes ) : this._attributes;
     };
     /**
      * @param {String} attribute 
      * @returns KunAttribute
      */
-    this.getAttribute = function( attribute ){
-        return this.hasAttribute( attribute ) ? _controller.attributes[ attribute ] : false;
+    KunAttributes.getAttribute = function( attribute ){
+        return this.has( attribute ) ? this._attributes[ attribute ] : false;
     };
     /**
      * Attribute exists?
      * @param {String} attribute 
      * @returns Boolean
      */
-    this.hasAttribute = ( attribute ) => _controller.attributes.hasOwnProperty( attribute );
+    KunAttributes.hasAttribute = function( attribute ){
+        return this.has( attribute );
+    };
     /**
      * @param {Number} actor_id 
      * @returns Object
      */
-    this.importDefaultValues = function( actor_id ){
+    KunAttributes.importDefaultValues = function( actor_id ){
         
         var attributes = {};
 
         this.actorAttributes( actor_id ).forEach( function( def ){
-            attributes[def.name] = def.value;
+            attributes[def.name] = {
+                'value': def.value,
+                'max': def.max,
+            };
         });
 
         return attributes;
@@ -203,15 +248,47 @@ function KunAttributes(){
      * @param {Number} actor_id 
      * @returns Object
      */
-    this.importDefaults = function( actor_id ){
+    KunAttributes.importDefaults = function( actor_id ){
         return this.actorAttributes(actor_id).map( attribute => attribute.export() );
     };
-}
+
+
+
+/**
+ * 
+ * @param {Object} input 
+ * @returns KunAttributes
+ */
+KunAttributes.Import = function( input ){
+
+    var output = [];
+
+    input.map( att => att.length ? JSON.parse(att) : null ).forEach( function( att ){
+        if( att !== null ){
+                //console.log( attribute );
+                KunAttributes.add(
+                    att.name,
+                    att.title || att.name.toLowerCase().replace(/[\s\_]/,'-'),
+                    att.display,
+                    parseInt( att.maximum ),
+                    parseInt( att.value ),
+                    parseInt( att.icon ),
+                    parseInt( att.color1 ),
+                    parseInt( att.color2 ),
+                    att.actors.length > 0 ? JSON.parse( att.actors ).map( actor_id => parseInt( actor_id ) ) : [],
+                );
+        }
+
+    });
+
+    return this;
+};
+
 
 /**
  * 
  */
-KunAttributes.SetupActorAttributes = function(){
+function KunAttributes_SetupActorAttributes(){
     //OVERRIDE CHARACTER STATS
     var _KunAttributes_InitMembers = Game_Actor.prototype.initMembers;
     Game_Actor.prototype.initMembers = function() {
@@ -222,19 +299,19 @@ KunAttributes.SetupActorAttributes = function(){
         this.setupAttributes();
     };
     Game_Actor.prototype.setupAttributes = function( ){
-        //this._kunAtts = KUN.Attributes.importDefaultValues( this._actorId );
+        //this._kunAtts = KunAttributes.importDefaultValues( this._actorId );
         this._kunAtts = this.attributes();
         var _self = this;
         this.defaultAttributes().forEach( function( att ){
             _self.importAttribute( att.name , att.max , att.value );
         });
-        console.log( this.attributes());
+        //console.log( this.attributes());
     };
     /**
      * @returns Array
      */
     Game_Actor.prototype.defaultAttributes = function(){
-        return KUN.Attributes.importDefaults( this._actorId );
+        return KunAttributes.importDefaults( this._actorId );
     };
     /**
      * @param {String} attribute 
@@ -274,16 +351,31 @@ KunAttributes.SetupActorAttributes = function(){
         return 0;
     };
     /**
+     * Export the % value of the selected attribute
      * @param {String} attribute 
-     * @param {Number} value 
-     * @param {Boolean} maxValue
      * @returns Number
      */
-    Game_Actor.prototype.setAttribute = function( attribute , value , maxValue ){
+    Game_Actor.prototype.getAttributeProgress = function( attribute ){
+        if( this.hasAttribute( attribute ) ){
+            var _attribute = this.attributes()[attribute];
+            return _attribute.max > 0 ? parseInt(_attribute.value / _attribute.max * 100) : 0;
+        }
+        return 0;
+    };
+    /**
+     * @param {String} attribute 
+     * @param {Number} value 
+     * @param {Boolean} setMaximum
+     * @returns Number
+     */
+    Game_Actor.prototype.setAttribute = function( attribute , value , setMaximum ){
         value = typeof value === 'number' && value > 0 ? value : 0;
         if( this.hasAttribute( attribute ) ){
-            if( typeof maxValue === 'boolean' && maxValue && value > 0 ){
+            if( typeof setMaximum === 'boolean' && setMaximum && value > 0 ){
                 this.attributes()[attribute].max = value;
+                if( this.attributes()[attribute].value > value ){
+                    this.attributes()[attribute].value = value;
+                }
             }
             else{
                 this.attributes()[attribute].value = value;
@@ -298,8 +390,8 @@ KunAttributes.SetupActorAttributes = function(){
      */
     Game_Actor.prototype.resetAttribute = function( attribute , fullReset ){
         if( typeof fullReset === 'boolean' && fullReset && this.hasAttribute( attribute ) ){
-                var att = KUN.Attributes.getAttribute(attribute).export();
-                this.importAttribute( attribute , att.max , att.value );    
+                var att = KunAttributes.getAttribute(attribute).export();
+                this.importAttribute( att.name , att.max , att.value );    
                 return this.getAttribute(attribute);
         }
         return this.setAttribute( attribute );
@@ -327,14 +419,15 @@ KunAttributes.SetupActorAttributes = function(){
         if( value !== 0 && this.hasAttribute( attribute ) ){
             var max = this.getAttribute( attribute , true );
             var current = this.getAttribute( attribute );
-            if( current + value < 0 ){
-                value = 0;
-            }
-            else if( max < current + value ){
-                value = max;
-            }
-            else{
-                value += current;
+            switch( true ){
+                case current + value < 0:
+                    value = 0
+                    break;
+                case max < current + value:
+                    value = max;
+                    break;
+                default:
+                    value += current;
             }
             return this.setAttribute( attribute , value );
         }
@@ -344,13 +437,13 @@ KunAttributes.SetupActorAttributes = function(){
 /**
  * 
  */
-KunAttributes.SetupCommands = function(){
+function KunAttributes_SetupCommands(){
     //override vanilla interpreter
     var _KunSpecialAtts_GameInterPreter_Command = Game_Interpreter.prototype.pluginCommand;
     Game_Interpreter.prototype.pluginCommand = function(command, args) {
         _KunSpecialAtts_GameInterPreter_Command.call(this, command, args);
         if( command === 'KunAttributes'  && args.length >= 4 ){
-            var importVar = args.length > 4 && args[4] === 'import';
+            var _import = args.length > 4 && args[4] === 'import';
             //override with plugin command manager
             switch (args[0]) {
                 case 'reset':
@@ -358,29 +451,53 @@ KunAttributes.SetupCommands = function(){
                         kun_attribute_reset( parseInt(args[1]) , args[2] );
                     }
                     break;
+                case 'maximum':
+                    if( args.length > 2 ){
+                        kun_attribute_maximum(
+                             _import ? $gameVariables.value( parseInt( args[ 1 ] ) ) : parseInt( args[ 1 ] ) ,
+                             args[2] ,
+                             _import ? $gameVariables.value( parseInt( args[ 3 ] ) ) : parseInt( args[ 3 ] ) );
+                    }
+                    break;
                 case 'set':
                     if( args.length > 3 ){
-                        kun_attribute_set( parseInt(args[1]) , args[2] , parseInt(args[3]) , importVar );
+                        kun_attribute_set(
+                            _import ? $gameVariables.value( parseInt( args[ 1 ] ) ) : parseInt( args[ 1 ] ) ,
+                            args[2] ,
+                            _import ? $gameVariables.value( parseInt( args[ 3 ] ) ) : parseInt( args[ 3 ] ) );
                     }
                     break;
                 case 'add':
                     if( args.length > 3 ){
-                        kun_attribute_add( parseInt(args[1]) , args[2] , parseInt(args[3]) , importVar );
+                        kun_attribute_add( 
+                            _import ? $gameVariables.value( parseInt( args[ 1 ] ) ) : parseInt( args[ 1 ] ) ,
+                            args[2] ,
+                            _import ? $gameVariables.value( parseInt( args[ 3 ] ) ) : parseInt( args[ 3 ] ) );
                     }
                     break;
                 case 'sub':
                     if( args.length > 3 ){
-                        kun_attribute_sub( parseInt(args[1]) , args[2] , parseInt(args[3]) , importVar );
+                        kun_attribute_sub(
+                            _import ? $gameVariables.value( parseInt( args[ 1 ] ) ) : parseInt( args[ 1 ] ) ,
+                            args[2] ,
+                            _import ? $gameVariables.value( parseInt( args[ 3 ] ) ) : parseInt( args[ 3 ] ) );
+                    }
+                    break;
+                case 'progress':
+                    var _exportVar = args.length > 3 ? parseInt(args[3]) : 0;
+                    var _actor = args.length > 1 ? $gameActors.actor(parseInt(args[1])) : null;
+                    if( _actor !== null && _exportVar > 0 ){
+                        $gameVariables.setValue( _exportVar , _actor.getAttributeProgress( args[2]) );
                     }
                     break;
                 case 'export':
-                    var exportVar = args.length > 3 ? parseInt( args[3]) : 0;
-                    var exportMaxVar = args.length > 4 ? parseInt( args[4]) : 0;
+                    var _valueVar = args.length > 3 ? parseInt( args[3]) : 0;
+                    var _maxVar = args.length > 4 ? parseInt( args[4]) : 0;
                     var actor = args.length > 1 ? $gameActors.actor(parseInt(args[1])) : null;
-                    if( actor !== null && exportVar > 0 ){
-                        $gameVariables.setValue( exportVar , actor.getAttribute(args[2]) ) ;
-                        if( exportMaxVar > 0 ){
-                            $gameVariables.setValue( exportMaxVar , actor.getAttribute(args[2],true) ) ;
+                    if( actor !== null && _valueVar > 0 ){
+                        $gameVariables.setValue( _valueVar , actor.getAttribute( args[2]) ) ;
+                        if( _maxVar > 0 ){
+                            $gameVariables.setValue( _maxVar , actor.getAttribute( args[2],true) ) ;
                         }
                     }
                     break;
@@ -391,7 +508,7 @@ KunAttributes.SetupCommands = function(){
 /**
  * 
  */
-KunAttributes.SetupWindows = function(){
+function KunAttributes_SetupWindows(){
     /**
      * @returns Number
      */
@@ -417,24 +534,36 @@ KunAttributes.SetupWindows = function(){
     Window_Status.prototype.drawKunAttributes = function( x , y ){
         var lineHeight = this.lineHeight();
         //renedr gauges here.
-        var attributes = KUN.Attributes.actorAttributes( this.getActorID() );
+        var attributes = KunAttributes.actorAttributes( this.getActorID() );
+        var count = attributes.length;
         for( var i = 0 ; i < attributes.length ; i++ ){
-            this.drawKunAttribute( x , y + (lineHeight * i) , attributes[ i ] );
+            if( count > 6 ){
+                this.drawKunAttribute(
+                     i % 2 > 0 ? x + 140 : x,
+                     y + lineHeight * Math.floor(i / 2) , attributes[ i ] );
+            }
+            else{
+                //full width
+                this.drawKunAttribute( x , y + (lineHeight * i) , attributes[ i ] , true );
+            }
         }
     };
     /**
      * @param {Number} x 
      * @param {Number} y 
      * @param {String|KunAttribute} attribute 
+     * @param {Boolean} fullWidth
      * @returns 
      */
-    Window_Status.prototype.drawKunAttribute = function( x , y , attribute ){
+    Window_Status.prototype.drawKunAttribute = function( x , y , attribute , fullWidth ){
         
         //this._actor.getLust( true )
         //var attData = typeof attribute === 'object' && attribute instanceof KunAttribute ?
         //    attribute : //
-        //    typeof attribute === 'string' ? KUN.Attributes.getAttribute( attribute ) : false;
+        //    typeof attribute === 'string' ? KunAttributes.getAttribute( attribute ) : false;
         var attData = attribute || false;
+
+        fullWidth = typeof fullWidth === 'boolean' && fullWidth;
 
         if( attData === false ) return;
 
@@ -444,7 +573,7 @@ KunAttributes.SetupWindows = function(){
             return ;
         }
 
-        var width = 270;
+        var width = fullWidth ? 270 : 135;
         var showValue = display === KunAttributes.DisplayType.COUNTER || display === KunAttributes.DisplayType.FULL;
         var showGauge = display === KunAttributes.DisplayType.GAUGE || display === KunAttributes.DisplayType.FULL;
         var icon = attData.icon;
@@ -476,28 +605,6 @@ KunAttributes.SetupWindows = function(){
     };
 }
 
-
-KunAttributes.Import = function( input ){
-
-    var output = [];
-
-    ( input.length > 0 ? JSON.parse( input ) : [] ).map( gauge => gauge.length ? JSON.parse(gauge) : null ).forEach( function( gauge ){
-        if( gauge !== null ){
-            output.push({
-                'name': gauge.name,
-                'display': gauge.display,
-                'icon': parseInt(gauge.icon),
-                'color1': parseInt(gauge.color1),
-                'color2': parseInt(gauge.color2),
-                'maximum': parseInt(gauge.maximum),
-                'value': parseInt(gauge.value),
-                'actors': gauge.actors.length > 0 ? JSON.parse( gauge.actors ).map( actor_id => parseInt(actor_id ) ) : [],
-            });
-        }
-    });
-
-    return output;
-};
 /**
  * return Boolean
  */
@@ -506,7 +613,7 @@ KunAttributes.CheckSetupUI = () =>{ return KUN.hasOwnProperty('SetupUI') && KUN.
  * @param {String} message 
  */
 KunAttributes.DebugLog = function( message ){
-    if( KUN.Attributes.debug( ) ){
+    if( KunAttributes.debug( ) ){
         if( typeof message === 'object' ){
             console.log(  '[ KunAttributes ] - ' + message.constructor.name );
             console.log( message ) ;
@@ -523,64 +630,9 @@ KunAttributes.DisplayType = {
     'GAUGE': 'gauge',
     'FULL': 'full'
 };
-/**
- * @param {Number} actor_id 
- * @param {String} attribute 
- * @param {Number} value 
- * @param {Boolean} useVars 
- * @returns Number
- */
-function kun_attribute_sub( actor_id , attribute, value , useVars ){
-    if( typeof useVars === 'boolean' && useVars ){
-        actor_id = $gameVariables.value(actor_id);
-        value = $gameVariables.value(value);
-    }
-    return actor_id > 0 ? $gameActors.actor(actor_id).updateAttribute( attribute , -value ) : 0;
-}
-/**
- * @param {Number} actor_id 
- * @param {String} attribute 
- * @param {Number} value 
- * @param {Boolean} useVars 
- * @returns Number
- */
-function kun_attribute_add( actor_id , attribute, value , useVars ){
-    if( typeof useVars === 'boolean' && useVars ){
-        actor_id = $gameVariables.value(actor_id);
-        value = $gameVariables.value(value);
-    }
-    return actor_id > 0 ? $gameActors.actor(actor_id).updateAttribute( attribute , value ) : 0;
-}
-/**
- * @param {Number} actor_id 
- * @param {String} attribute 
- * @param {Number} value (optional)
- * @param {Boolean} useVars 
- * @returns 
- */
-function kun_attribute_set( actor_id , attribute, value , useVars ){
-    if( typeof useVars === 'boolean' && useVars ){
-        actor_id = $gameVariables.value(actor_id);
-        value = $gameVariables.value(value);
-    }
-    return actor_id > 0 ? $gameActors.actor(actor_id).setAttribute( attribute , value ) : 0;
-}
-/**
- * @param {Number} actor_id 
- * @param {String} attribute 
- * @returns 
- */
-function kun_attribute_reset( actor_id , attribute ){
-    return actor_id > 0 ? $gameActors.actor(actor_id).resetAttribute( attribute ) : 0;
-}
-/**
- * @param {Number} actor_id 
- * @param {String} attribute 
- * @returns 
- */
-function kun_attribute( actor_id , attribute ){
-    return actor_id > 0 ? $gameActors.actor(actor_id).getAttribute( attribute ) : 0;
-}
+
+
+
 /**
  * @param {String} name 
  * @param {String} title
@@ -605,56 +657,123 @@ function KunAttribute( name , title , display, max , value , icon , color1, colo
     this.color2 = color2 || 5;
     this.actors = actors || [];
 
-    /**
-     * @param {Number} actor_id 
-     * @returns boolean
-     */
-    this.available = ( actor_id ) => actor_id === 0 || this.actors.length === 0 || this.actors.includes( actor_id );
-    /**
-     * @returns Object
-     */
-    this.export = function(){
-        return {
-            'name':this.name,
-            'max': this.max,
-            'value': this.value,
-        };
-    };
-
     return this;
 }
+/**
+ * @param {Number} actor_id 
+ * @returns Boolean
+ */
+KunAttribute.prototype.available = function( actor_id ){
+    return actor_id === 0 || this.actors.length === 0 || this.actors.includes( actor_id ); 
+};
+/**
+ * @returns Object
+ */
+KunAttribute.prototype.export = function(){
+    return {
+        'name': this.name,
+        'max': this.max,
+        'value': this.value,
+    };
+};
+/**
+ * @param {Number} max 
+ * @returns KunAttribute
+ */
+KunAttribute.prototype.updateMax = function( max ){
+    if ( typeof max === 'number' && max > 0 ){
+        this.max = max;
+        if( this.value > this.max ){
+            this.vaue = this.max;
+        }
+    }
+    return this;
+};
 /**
  * @param {String} text 
  * @returns String
  */
 KunAttribute.ParseName = ( text ) => typeof text === 'string' ? text.toLowerCase().replace(/[\s\_]/,'-') : text;
+/** 
+ * @returns KunAttribute
+ */
+KunAttribute.Invalid = function(){
+    return new KunAttribute('__INVALID__');
+};
 
+
+
+/**
+ * @param {Number} actor_id 
+ * @param {String} attribute 
+ * @param {Number} maximum 
+ * @returns 
+ */
+function kun_attribute_maximum( actor_id , attribute , maximum ){
+    return actor_id > 0 ? $gameActors.actor(actor_id).setAttribute( attribute , maximum , true ) : 0;    
+};
+/**
+ * @param {Number} actor_id 
+ * @param {String} attribute 
+ * @param {Number} value 
+ * @returns Number
+ */
+function kun_attribute_sub( actor_id , attribute, value  ){
+    return kun_attribute_add( actor_id , attribute , -value , false );
+}
+/**
+ * @param {Number} actor_id 
+ * @param {String} attribute 
+ * @param {Number} value 
+ * @returns Number
+ */
+function kun_attribute_add( actor_id , attribute, value ){
+    if( actor_id ){
+        var actor = $gameActors.actor(actor_id);
+        if( actor !== null ){
+            return $gameActors.actor(actor_id).updateAttribute( attribute , value );
+        }
+    }
+    return 0;
+}
+/**
+ * @param {Number} actor_id 
+ * @param {String} attribute 
+ * @param {Number} value (optional)
+ * @returns 
+ */
+function kun_attribute_set( actor_id , attribute, value ){
+    return actor_id > 0 ? $gameActors.actor(actor_id).setAttribute( attribute , value ) : 0;
+}
+/**
+ * @param {Number} actor_id 
+ * @param {String} attribute 
+ * @param {Boolean} fullReset
+ * @returns 
+ */
+function kun_attribute_reset( actor_id , attribute , fullReset ){
+    return actor_id > 0 ? $gameActors.actor(actor_id).resetAttribute( attribute , fullReset ) : 0;
+}
+/**
+ * @param {Number} actor_id 
+ * @param {String} attribute 
+ * @returns 
+ */
+function kun_attribute( actor_id , attribute ){
+    return actor_id > 0 ? $gameActors.actor(actor_id).getAttribute( attribute ) : 0;
+}
 
 
 ( function( ){
 
-    var parameters = PluginManager.parameters('KunAttributes');
-    KUN.Attributes = new KunAttributes();
-    KUN.Attributes.Set.Debug( parameters.debug === 'true' );
-    KunAttributes.Import( parameters.attributes ).forEach( function( attribute ){
-        //console.log( attribute );
-        KUN.Attributes.add(
-            attribute.name,
-            attribute.display,
-            attribute.maximum,
-            attribute.value,
-            attribute.icon,
-            attribute.color1,
-            attribute.color2,
-            attribute.actors
-        );
-    });
+    KunAttributes.Initialize();
 
-    //console.log( KUN.Attributes.attributes(true).map( att => att.export()) );
 
-    KunAttributes.SetupActorAttributes();
-    KunAttributes.SetupWindows();
-    KunAttributes.SetupCommands();
+    //console.log( KunAttributes.attributes(true).map( att => att.export()) );
+
+    KunAttributes_SetupActorAttributes();
+    KunAttributes_SetupWindows();
+    KunAttributes_SetupCommands();
 } )( );
 
 
