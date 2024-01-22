@@ -4,7 +4,7 @@
 /*:
  * @filename KunAnimations.js
  * @plugindesc Kun Interactive Picture Animations - Animate pictures with custom framesets and commands, now featuring an interactive framework to click over specific hotspots depending on the frameset running.
- * @version 1.99
+ * @version 1.93
  * @author KUN
  * @target MC | MZ
  * 
@@ -155,6 +155,10 @@
  * @text Animation Scenes
  * @desc Define the DataBase of Animation Scene Controllers (keep it clean and easy!!)
  * 
+ * @param soundBank
+ * @type struct<SoundBank>[]
+ * @text Sound Banks
+ * @desc Define the list of Sound Effect Reactions and specific Framesets
  */
 /*~struct~Controller:
  *
@@ -188,7 +192,7 @@
  * 
  * @param framesets
  * @type struct<FrameSet>[]
- * @text Animation Layers
+ * @text Framesets
  * @desc Frameset Collection
  * 
  * @param hotspots
@@ -211,13 +215,12 @@
  * @default new-frameset
  * 
  * @param frames
- * @text FrameSet
+ * @text Frames
  * @type number[]
  * @min 0
  * @desc List of frames to play in this animation
  * 
  * @param type
- * @parent frames
  * @text Animation Type
  * @type select
  * @option Forward (default)
@@ -231,7 +234,6 @@
  * @default forward
  * 
  * @param fps
- * @parent frames
  * @text Frames Per Second
  * @desc Default FPS for this frameset (leave to 0 to get master FPS as default)
  * @type number
@@ -239,15 +241,13 @@
  * @default 0
  * 
  * @param loops
- * @parent frames
  * @type number
  * @text Loops
  * @desc number of times the animation will play before switching to the next animation. Leave it to 0 for endless loops (no next animation)
  * @default 0
  * 
  * @param next
- * @parent frames
- * @text Next Layers
+ * @text Next FrameSets
  * @type text[]
  * @desc Define the next frameset to call. If more than one specified, they will be randomly called
  * 
@@ -261,12 +261,6 @@
  * @type number
  * @default 0
  * 
- * @param clearTargets
- * @type boolean
- * @text Clear Target Queue
- * @desc Clear all targets in the queue when loading this frameset layer
- * @default false
- * 
  * @param spots
  * @type struct<TouchSpot>[]
  * @text Touch Spots
@@ -274,105 +268,16 @@
  * @default []
  * 
  * @param bank
- * @text Sound Banks
- * @desc Play one of these sound banks each time this frameset is started. Requires KunSoundBanks.
+ * @text Sound Bank
+ * @desc Type in a defined sound bank name to play a special sound set each time this frameset is started.
  * @type text[]
  * @default []
  * 
- * @param actions
- * @type struct<LayerAction>[]
- * @text Layer Actions
- * @desc Do this when running this layer
- * @default []
- * 
- * @param conditions
- * @type struct<LayerCondition>[]
- * @text Layer Conditions
- * @desc Run this layer when meeting these conditions
- * @default []
- */
-/*~struct~LayerAction:
- * @param once
- * @type boolean
- * @text Run Once
- * @desc Run this action just once in this Scene
- * @default false
- * 
- * @param var
- * @type variable
- * @text Game Variable
- * @desc define a game variable to update with this action
- * @min 0
- * @default 0
- * 
- * @param op
- * @text Operator
- * @desc Operation type to run on the Game Variable
- * @type select
- * @option Add
- * @value add
- * @option Sub
- * @value sub
- * @option Set
- * @value set
- * @default add
- * 
- * @param val
- * @text Value
- * @desc Value to update the game variable with
- * @type number
- * @min 0
- * @default 0
- * 
- * @param swon
- * @type switch[]
- * @text Game Switch On
- * @desc define a list of game switches to activate when running this animation layer
- * @min 0
- * @default []
- * 
- * @param swoff
- * @type switch[]
- * @text Game Switch Off
- * @desc define a list of game switches to disable when running this animation layer
- * @min 0
- * @default []
- */
-/*~struct~LayerCondition:
- * @param var
- * @type variable
- * @text Game Variable
- * @desc define a game variable to check for this condition
- * @min 0
- * @default 0
- * 
- * @param op
- * @text Operator
- * @desc Select the type of operation to cast over the value for this Game Variable
- * @type select
- * @option Greater
- * @value greater
- * @option Greater or equal
- * @value greater_equal
- * @option Equal
- * @value equal
- * @option Less or equal
- * @value less_equal
- * @option Less
- * @value less
- * 
- * @param val
- * @type number
- * @text Value Range
- * @desc Operate with this value
- * @min 0
- * @default 0
  */
 /*~struct~TouchSpot:
  * 
  * @param name
  * @text Name
- * @desc Define here a touch event when hitting a specific area.
  * @type text
  * @default touch-me-here
  * 
@@ -464,16 +369,76 @@
  * @type number
  * @min 1
  * @default 1
+ * 
+ */
+/*~struct~SoundBank:
+ *
+ * @param name
+ * @text Name
+ * @type text
+ * @default new-sound-bank
+ * 
+ * @param round
+ * @text Rounds
+ * @type number
+ * @desc Play a sound selection every N frameset loops
+ * @min 0
+ * @max 10
+ * @default 0
+ * 
+ * @param chance
+ * @text Chance
+ * @type number
+ * @min 1
+ * @max 100
+ * @default 100
+ * 
+ * @param sfx
+ * @text Sound Effect Collection
+ * @type file[]
+ * @desc Add a selection of sound effects to play in this sound bank
+ * @require 1
+ * @dir audio/se/
+ * 
+ * @param volume
+ * @text Volume
+ * @desc Define a single volume value, a random volume interpolation among 2 values, or a random volume from 3 or more values.
+ * @type number[]
+ * @min 0
+ * @max 100
+ * @default ["90"]
+ * 
+ * @param pitch
+ * @text Pitch
+ * @desc Define a single pitch value, a random pitch interpolation among 2 values, or a random pitch from 3 or more values.
+ * @type number[]
+ * @min 50
+ * @max 150
+ * @default ["100"]
+ * 
+ * @param pan
+ * @text Pan
+ * @desc Define a single pan value, a random pan interpolation among 2 values, or a random pan from 3 or more values.
+ * @type number[]
+ * @min -100
+ * @max 100
+ * @default ["0"]
+ * 
+ * @param interrupt
+ * @text Allow SE interruption
+ * @desc Stop playing other Sound Effects when this bank plays a selection
+ * @type boolean
+ * @default false
+ *
  */
 
-
-//const { count } = require('console');
+const { count } = require('console');
 
 /**
  * @description KUN Modules
  * @type KUN
  */
-//var KUN = KUN || {};
+var KUN = KUN || {};
 
 /**
  * 
@@ -515,9 +480,9 @@ KunSceneManager.Initialize = function(){
     this._animationPacks = parseInt(parameters.animPacks || 0);
 
     var framesets = parameters.controllers.length > 0 ? JSON.parse(parameters.controllers ) : [];
-    //var banks = parameters.soundBank.length > 0 ? JSON.parse(parameters.soundBank) : [];
+    var banks = parameters.soundBank.length > 0 ? JSON.parse(parameters.soundBank) : [];
 
-    return this.ImportScenes( framesets );
+    return this.ImportScenes( framesets ).ImportSoundBanks( banks );
 };
 /**
  * @returns Object
@@ -559,14 +524,37 @@ KunSceneManager.canInterrupt = function(){
         return this._debug > KunSceneManager.DebugMode().Disabled;
     };
     /**
+     * @param {Boolean} list 
+     * @returns Object | Object[]
+     */
+    KunSceneManager.banks = function( list ){
+        return typeof list === 'boolean' && list ? Object.values( this._soundBanks ) : this._soundBanks;
+    };
+    /**
      * @param {String} bank 
-     * @param {Number} round
+     * @returns Boolean
+     */
+    KunSceneManager.hasBank = function( bank ){
+        return typeof bank === 'string' && bank.length > 0 && this._soundBanks.hasOwnProperty( bank );
+    };
+    /**
+     * @param {KunSoundBank} bank 
      * @returns KunSceneManager
      */
-    KunSceneManager.playBank = function( bank , round ){
-        if( typeof KunSoundBanks === 'function' ){
-            //KunSceneManager.DebugLog( `Playing Sound Bank: ${bank}` );
-            KunSoundBanks.play( bank , round );
+    KunSceneManager.addBank = function( bank){
+        if( bank instanceof KunSoundBank && !this.hasBank( bank ) ){
+            this._soundBanks[ bank.name() ] = bank;
+        }
+        return this;
+    };
+    /**
+     * @param {String} bank 
+     * @returns KunSceneManager
+     */
+    KunSceneManager.playBank = function( bank ){
+        if( this.hasBank( bank ) ){
+            //console.log( bank );
+            this.banks()[bank].play();
         }
         return this;
     };
@@ -575,7 +563,7 @@ KunSceneManager.canInterrupt = function(){
      * @returns KunSoundBank
      */
     KunSceneManager.soundBank = function( bank ){
-        return ( typeof KunSoundBanks === 'function' ) ? KunSoundBanks.get( bank ) : null;
+        return this.hasBank( bank ) ? this.banks()[bank] : KunSoundBank.Empty();
     };
     /**
      * 
@@ -679,19 +667,21 @@ KunSceneManager.canInterrupt = function(){
         return {'x':0,'y':0};
     };
     /**
-     * @param {String} picture
+     * @param {String} controller
      * @param {String} spot
      * @param {Number} x 
      * @param {Number} y 
      * @returns Boolean
      */
-    KunSceneManager.enqueue = function( picture , spot , x , y ){
+    KunSceneManager.enqueue = function( controller , spot , x , y  ){
         if( this.targets().length < this.limit() ){
             this.targets().push({
-                'scene':picture,
+                'controller':controller,
                 'spot': spot,
                 'x':x,
                 'y':y,
+                //'sx': typeof sx === 'number' && sx > 0 ? sx : x,
+                //'sy': typeof sy === 'number' && sy > 0 ? sy : y,
             });
             this.updateTouchPoints( this.countTargets()).playFx();
             return true;
@@ -737,50 +727,30 @@ KunSceneManager.canInterrupt = function(){
      */
     KunSceneManager.target = function( random ){
         if(this.countTargets()){
-            var touch = this.nextSpot( random );
+            var spot = this.nextSpot( random );
             //console.log(spot);
-            var scene = this.get(touch.scene);
-            if( scene !== null ){
-                var fs = scene.current();
+            var controller = this.get(spot.controller);
+            if( controller !== null ){
+                var fs = controller.current();
                 if( fs !== null ){
-                        var target = fs.getSpot(touch.spot);
+                        var target = fs.getSpot(spot.spot);
                         if( target !== null ){
                             target.update();
                             //export X and Y positions
-                            this.exportPosition( touch.x , touch.y );
+                            this.exportPosition( spot.x , spot.y );
                             //jump to next frameset (if any)
-                            scene.changeLayer( scene.selectLayer( target.nextLayers() , true ) , true );
-                            //this.selectLayer( this.current().next() , true )
-                            //scene.changeLayer( target.next() , true );
+                            controller.changeLayer( target.next() , true );
                         }
                 }
                 else{
-                    KunSceneManager.DebugLog(`Invalid FrameSet ${touch.spot}`);    
+                    KunSceneManager.DebugLog(`Invalid FrameSet ${spot.spot}`);    
                 }
             }
             else{
-                KunSceneManager.DebugLog(`Invalid Controller ${touch.scene}`);
+                KunSceneManager.DebugLog(`Invalid Controller ${spot.controller}`);
             }
         }    
         return this.updateTouchPoints(this.countTargets());
-    };
-    /**
-     * @param {String} picture 
-     * @returns KunSceneManager
-     */
-    KunSceneManager.randomTarget = function( picture ){
-        var scene = this.get(picture);
-        if( scene !== null ){
-            var layer = scene.current();
-            if( layer !== null ){
-                var spot = layer.randomSpot();
-                if( spot !== null ){
-                    var pos = spot.generatePosition( );
-                    this.exportPosition( pos.x , pos.y );
-                }
-            }
-        }
-        return this;
     };
     /**
      * @param {Number} x 
@@ -1007,11 +977,11 @@ KunSceneManager.ImportScenes = function( input ){
     var _spotCounter = 0;
     var _layerCounter = 0;
     var _pictureCounter = 0;
-    var _actionCounter = 0;
-    var _conditionCounter = 0;
 
     //input.map( ctl => ctl.length > 0 ? JSON.parse( ctl ) : null ).forEach(function( ctl ){
     KunSceneManager.importAnimationPacks( input ).map( controller => KunSceneImporter.parse( controller ) ).filter( controller => controller !== null ).forEach(function( ctl ){
+        //if( ctl !== null ){
+
             //var _pictures = typeof ctl.source === 'string' && ctl.source.length > 0 ?  (/^\[.*\]$/.test(ctl.source) ? JSON.parse(ctl.source) : [ctl.source])   : [];
             //var prefix = typeof ctl.prefix === 'string' && ctl.prefix.length > 0 ? JSON.parse( ctl.prefix ) : [];
             var _pictures = KunSceneImporter.parseArray(ctl.source);
@@ -1031,17 +1001,17 @@ KunSceneManager.ImportScenes = function( input ){
             //import all scene defined hotspots
             //( ctl.hotspots.length ? JSON.parse(ctl.hotspots) : [] ).map( spot => JSON.parse(spot) ).forEach(function( spot ){
             KunSceneImporter.parse(ctl.hotspots , []).map( spot => JSON.parse(spot) ).forEach(function( spot ){
-                    if( !_spots.hasOwnProperty( spot.name ) ){
-                        _spots[spot.name] = spot;
-                    }
+                if( !_spots.hasOwnProperty( spot.name ) ){
+                    _spots[spot.name] = spot;
+                }
             });
             //prepare the layer framesets
-            KunSceneImporter.parse( ctl.framesets , [] ).map( fs => KunSceneImporter.parse( fs ) ).filter( fs => fs !== null ).forEach(function(fs){
+            //var _layers = ctl.framesets.length > 0 ? JSON.parse(ctl.framesets) : [];
+            var _layers = KunSceneImporter.parse( ctl.framesets , [] );
+            //_layers.map( fs => fs.length > 0 ? JSON.parse(fs) : null ).forEach(function(fs){
+            _layers.map( fs => KunSceneImporter.parse( fs ) ).filter( fs => fs !== null ).forEach(function(fs){
+                //if( fs !== null ){
                     _layerCounter++;
-                    //leave this here for debugging.
-                    if( KunSceneManager.debug(KunSceneManager.DebugMode().TraceLog) ){
-                        KunSceneManager.DebugLog(`Reading ${ctl.source}.${fs.name}`);
-                    }
                     var _layer = new KunAnimationLayer(
                         fs.name ,
                         fs.type ,
@@ -1050,37 +1020,24 @@ KunSceneManager.ImportScenes = function( input ){
                         fs.next.length > 0 ? JSON.parse(fs.next) : '' ,
                         //typeof fs.bank === 'string' && fs.bank.length > 0 ?  (/^\[.*\]$/.test(fs.bank) ? JSON.parse(fs.bank) : [fs.bank])   : [], //Match fix to the next update and backwards compatibility with a single string value
                         KunSceneImporter.parseArray( fs.bank ),
-                        fs.offsetX, fs.offsetY,
-                        fs.clearTargets === 'true' );
+                        fs.offsetX, fs.offsetY );
+
                     //( fs.frames.length > 0 ? JSON.parse(fs.frames) : [] ).map( frame => parseInt( frame ) ).forEach(function( frame ){
-                    //import layer frames
                     KunSceneImporter.parse( fs.frames , [] ).map( frame => parseInt( frame ) ).forEach(function( frame ){
                         _layer.add( frame );
                     });
-                    //import layer actions
-                    KunSceneImporter.parse( fs.actions , []).map( action => JSON.parse(action)).forEach( function( action ){
-                        _layer.addAction(new KunLayerAction(
-                            parseInt(action.var || 0 ),
-                            action.op || '',
-                            parseInt(action.val || 0 ),
-                            KunSceneImporter.parse( action.swon , []),
-                            KunSceneImporter.parse( action.swoff , []),
-                            action.runOnce === 'true'
-                        ));
-                        _actionCounter++;
-                    });
-                    //import layer conditions
-                    KunSceneImporter.parse( fs.conditions , []).map( condition => JSON.parse(condition)).forEach( function( condition ){
-                        _layer.addCondition( new KunLayerCondition(
-                            parseInt(condition.var || 0 ),
-                            condition.op || '',
-                            parseInt(condition.val || 0 )
-                        ));
-                        _conditionCounter++;
-                    });
+                    //leave this here for debugging.
+                    if( KunSceneManager.debug(KunSceneManager.DebugMode().TraceLog) ){
+                        KunSceneManager.DebugLog(`Reading ${ctl.source}.${fs.name}`);
+                    }
+
+                    //var _events = fs.spots.length > 0 ? JSON.parse(fs.spots) : [];
+                    var _events = KunSceneImporter.parse( fs.spots , []);
+                    _spotCounter += _events.length;
+
                     //( _events ).map( s => s.length > 0 ? JSON.parse(s) : null ).forEach(  function( s ){
-                    //import layer events
-                    KunSceneImporter.parse( fs.spots , []).map( spot => KunSceneImporter.parse( spot ) ).forEach(  function( spot ){
+                    _events.map( spot => KunSceneImporter.parse( spot ) ).filter( spot => spot !== null ).forEach(  function( spot ){
+                        if( _spots.hasOwnProperty(spot.name)){
                             var event = new KunTouchEvent(
                                 spot.name,
                                 parseInt(_spots[spot.name].x1),
@@ -1094,15 +1051,17 @@ KunSceneManager.ImportScenes = function( input ){
                                 _spots[spot.name].sfx,
                                 //spot.next.length > 0 ? JSON.parse(s.next) : []  );
                                 KunSceneImporter.parseArray( spot.next , [] )  );
-                            _layer.registerSpot(event);
-                            _spotCounter++;
+                                _layer.registerSpot(event);    
+                        }
                     });
                     //KunSceneManager.DebugLog( _layer.spots() );
+
                     if( _layer.count() > 0 ){
                         _scenes.forEach( function( scene ){
                             scene.add( _layer );
                         } );
                     }
+                //}
             });
 
             _scenes.forEach( function( scene ){
@@ -1110,11 +1069,11 @@ KunSceneManager.ImportScenes = function( input ){
                     KunSceneManager.addScene( scene );
                 }
             });
+        //}
     });
-    //leave this here for debugging.
+                    //leave this here for debugging.
     if( KunSceneManager.debug(KunSceneManager.DebugMode().TraceLog) ){
         KunSceneManager.DebugLog(`Imported a total of ${_pictureCounter} animated pictures, ${_layerCounter} animation layers and ${_spotCounter} hotspots`);
-        KunSceneManager.DebugLog(`Imported a total of ${_actionCounter} actions and  ${_conditionCounter} conditions`);
     }
 
     return this;
@@ -1123,7 +1082,7 @@ KunSceneManager.ImportScenes = function( input ){
  * @param {Object[]} input 
  * @returns KunSceneManager
  */
-/*KunSceneManager.ImportSoundBanks = function( input ){
+KunSceneManager.ImportSoundBanks = function( input ){
     (input).map( sb => sb.length > 0 ? JSON.parse( sb ) : null ).forEach( function( bank ){
         var sb = new KunSoundBank( bank.name , bank.chance , bank.interrupt === 'true' , parseInt( bank.round  ||  0 ) );
         (bank.pitch.length > 0 ? JSON.parse(bank.pitch) : []).map(pitch => parseInt( pitch )).forEach(function( pitch ){
@@ -1143,7 +1102,7 @@ KunSceneManager.ImportScenes = function( input ){
         KunSceneManager.addBank( sb );
     });
     return this;
-};*/
+};
 /**
  * @returns Object
  */
@@ -1242,12 +1201,11 @@ KunSceneManager.FilePath = function( file ){
 /**
  * 
  */
-//function KunAnimationScene(){
-    //this.initialize.apply( this , arguments );
-//}
+function KunAnimationScene(){
+    this.initialize.apply( this , arguments );
+}
 
-//KunAnimationScene.prototype.initialize = function( name , cols , rows , fps , prefix ){
-function KunAnimationScene( name , cols , rows , fps , prefix ){
+KunAnimationScene.prototype.initialize = function( name , cols , rows , fps , prefix ){
 
     this._name = name;
     this._cols = cols || 1;
@@ -1257,15 +1215,14 @@ function KunAnimationScene( name , cols , rows , fps , prefix ){
     };
     this._elapsed = 0;
     this._loopCount = 0;
-    this._reverse = false;
+    this._forward = true;
     this._playing = false;
 
     this._index = 0;
     this._current = '';
 
-    this._defaultFps = fps || KunSceneManager.defaultFps();
     //this one can be overriden
-    this._fps = this._defaultFps;
+    this._fps = fps || KunSceneManager.defaultFps();
     this._touching = false;
     this._prefix = typeof prefix === 'string' && prefix.length ? prefix : '';
     //this._touch = [];
@@ -1275,15 +1232,7 @@ function KunAnimationScene( name , cols , rows , fps , prefix ){
 /**
  * @returns Boolean
  */
-KunAnimationScene.prototype.isValid = function(){
-    return this._name !== 'INVALID' && !this.empty();
-};
-/**
- * @returns Boolean
- */
-KunAnimationScene.prototype.isReady = function(){
-    return this._current.length > 0 && this.has(this._current);
-};
+KunAnimationScene.prototype.isValid = function(){ return this._name !== 'INVALID' && !this.empty(); };
 /**
  * @returns String
  */
@@ -1295,7 +1244,7 @@ KunAnimationScene.prototype.name = function(){ return this._name; };
 /**
  * @returns KunAnimationLayer
  */
-KunAnimationScene.prototype.current = function(){ return this.isReady() ? this.layers()[this._current] : null; };
+KunAnimationScene.prototype.current = function(){ return this.has(this._current) ? this._animationLayers[this._current] : null; };
 /**
  * @returns Boolean
  */
@@ -1419,7 +1368,7 @@ KunAnimationScene.prototype.resume = function(){
  * @returns Number
  */
 KunAnimationScene.prototype.getFrame = function(){
-    return this.isReady() ? this.layers()[this._current].getFrame( this._index ) : 0;
+    return this.has(this._current) ? this._animationLayers[this._current].getFrame( this._index ) : 0;
 };
 /**
  * @returns Number
@@ -1438,22 +1387,19 @@ KunAnimationScene.prototype.rows = function(){ return this._rows; }
  */
 KunAnimationScene.prototype.totalFrames = function(){ return this._cols * this._rows; };
 /**
- * @param {String} layer 
+ * @param {String} fs 
  * @returns Boolean
  */
-KunAnimationScene.prototype.has = function( layer ){
-    return typeof layer === 'string' && layer.length > 0 && this.layers().hasOwnProperty( layer );
-}
+KunAnimationScene.prototype.has = function( fs ){ return fs.length > 0 && this._animationLayers.hasOwnProperty( fs ); }
 /**
  * @param {KunAnimationLayer} layer 
  * @returns {KunAnimationScene}
  */
 KunAnimationScene.prototype.add = function( layer ){
     if( layer instanceof KunAnimationLayer ){
-        this.layers()[ layer.name() ] = layer;
+        this._animationLayers[ layer.name() ] = layer;
         if( this._current.length === 0 ){
-            this._current = layer.name();
-            //this.changeLayer( layer.name());
+            this.changeLayer( layer.name());
         }
     }
     return this;
@@ -1468,10 +1414,10 @@ KunAnimationScene.prototype.setFps = function( fps ){
             this._fps = fps;
             break;
         case this.has(this._current):
-            this._fps = this.current().fps() || this.defaultFps();
+            this._fps = this._animationLayers[this._current].fps();
             break;
         default:
-            this._fps = this.defaultFps();
+            this._fps = KunSceneManager.defaultFps();
             break;
     }
     return this;
@@ -1496,71 +1442,28 @@ KunAnimationScene.prototype.countFrames = function(){
     return this.has(this._current) ? this.current().count() : 0;
 };
 /**
- * @param {String} layer
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.beforeChangeLayer = function( layer ){
-    if( this.has(layer) && this.layers()[layer].clearTargetQueue()){
-        //clear target queue on change from this scene to another
-        KunSceneManager.clearTargets();
-    }
-    return this;
-};
-/**
- * @param {String} layer 
+ * @param {String} fs 
  * @param {Boolean} play
  * @returns KunAnimationScene
  */
-KunAnimationScene.prototype.changeLayer = function( layer , play ){
-    if( this.has( layer ) ){
-        this.beforeChangeLayer( layer );
-        this._current = layer;
-        var layerFps = this.current().fps();
-        return this.reset( typeof play === 'boolean' && play ).setFps(layerFps).afterChangeLayer();
+KunAnimationScene.prototype.changeLayer = function( setName , play ){
+    if( this.has( setName ) ){
+        this._current = setName;
+        return this.setFps().reset( typeof play === 'boolean' && play );
     }
     return this;
-}
-/**
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.afterChangeLayer = function( ){
-    var current = this.current();
-    if( current !== null ){
-        //run all enqueued actions
-        current.runActions();
-    }
-    return this;
-};
-/**
- * @param {String[]} layers
- * @param {Boolean} filterLocked
- * @returns {String}
- */
-KunAnimationScene.prototype.selectLayer = function( layers , filterLocked ){
-    if( typeof filterLocked === 'boolean' && filterLocked ){
-        layers = this.layers(true)
-            .filter( fs => layers.includes(fs.name()) && fs.isUnlocked())
-            .map( fs => fs.name());
-    }
-    switch( true ){
-        case layers.length > 1:
-            return layers[ Math.floor( Math.random() * layers.length ) ];
-        case layers.length > 0:
-            return layers[0];
-        default:
-            return '';
-    }
 }
 /**
  * @param {Boolean} replay
  * @returns {KunAnimationScene}
  */
 KunAnimationScene.prototype.next = function( replay ){
-    var next = this.isReady() ? this.selectLayer( this.current().next() , true ) : '';
+    var next = this.has(this._current) ? this.current().getNext() : '';
     if( next.length > 0 ){
         return this.changeLayer( next , true );
     }
     if( typeof replay === 'boolean' && replay ){
+        //return this.changeLayer( this._current , true );
         return this.reset(true);
     }
     else{
@@ -1585,14 +1488,14 @@ KunAnimationScene.prototype.reset = function( play ){
     this._loopCount = this.current().loops();
     switch(this.current().behavior()){
         case KunSceneManager.Behavior.Reverse:
-            this._reverse = true;
+            this._forward = false;
             this._index = this.countFrames() - 1;
             break;
         case KunSceneManager.Behavior.Forward:
-            this._reverse = false;
+            this._forward = true;
             break;
         case KunSceneManager.Behavior.PingPong:
-            this._reverse = false;
+            this._forward = true;
             break;
         case KunSceneManager.Behavior.Static:
             break;
@@ -1601,12 +1504,11 @@ KunAnimationScene.prototype.reset = function( play ){
     return this.playBank( this._prefix );
 }
 /**
- * @param {Number} round
  * @returns {KunAnimationScene}
  */
-KunAnimationScene.prototype.playBank = function( round ){
+KunAnimationScene.prototype.playBank = function(){
     if( this.playing() ){
-        this.current().playBank( this._prefix , round );
+        this.current().playBank( this._prefix);
     }
     return this;
 };
@@ -1615,18 +1517,9 @@ KunAnimationScene.prototype.playBank = function( round ){
  */
 KunAnimationScene.prototype.playBankByRound = function( loop ){
     if( this.playing() ){
-        var bank = this.current().selectSoundBank();
-        if( bank.length > 0 ){
-            KunSceneManager.playBank( bank , loop );
-        }
+        this.current().getSoundBank().playRound( loop );
     }
     return this;
-};
-/**
- * @returns Number
- */
-KunAnimationScene.prototype.defaultFps = function(){
-    return this._defaultFps;
 };
 /**
  * @returns Number
@@ -1667,19 +1560,19 @@ KunAnimationScene.prototype.update = function(){
  * @returns KunAnimationScene
  */
 KunAnimationScene.prototype.updatePingPong = function(){
-    if( !this._reverse ){
-        //ping
-        this._index = ( this._index + 1 ) % this.countFrames();
-        if( this._index === 0 ){
-            this._reverse = true;
+    var frameCount = this.countFrames();
+    if( this._forward ){
+        this._index = ++this._index % frameCount;
+        if( this._index === frameCount - 1 ){
+            this._forward = false;
         }
     }
     else if(this._index > 0){
-        //pong
+        //reverse
         this._index--;
     }
     //after complete the round
-    if( this._index === 0 && this._reverse ){
+    if( this._index === 0 && !this._forward ){
         if( this._loopCount > 0 ){
             this._loopCount--;
             if( this._loopCount === 0 ){
@@ -1688,7 +1581,7 @@ KunAnimationScene.prototype.updatePingPong = function(){
             }
             this.playBankByRound(this._loopCount);
         }
-        this._reverse = false;
+        this._forward = true;
     }
     return this;
 }
@@ -1708,7 +1601,6 @@ KunAnimationScene.prototype.updateReverse = function(){
             }
             this.playBankByRound(this._loopCount);
         }
-        //reset counter
         this._index = this.countFrames()-1;
     }
     return this;
@@ -1717,8 +1609,9 @@ KunAnimationScene.prototype.updateReverse = function(){
  * @returns KunAnimationScene
  */
 KunAnimationScene.prototype.updateForward = function(){
-    this._index = ( this._index + 1 ) % this.countFrames();
-    if( this._index === 0 ){
+    var frameCount = this.countFrames()
+    this._index = ++this._index % frameCount;
+    if( this._index === frameCount - 1 ){
         if( this._loopCount > 0 ){
             this._loopCount--;
             if( this._loopCount === 0 ){
@@ -1736,14 +1629,11 @@ KunAnimationScene.prototype.updateForward = function(){
  * @returns KunAnimationScene
  */
 KunAnimationScene.prototype.instance = function(){
-    var copy = new KunAnimationScene( this._name, this._cols,this._rows , this.FPS() , this._prefix );
-    copy._frameSets = this.layers();
+    var copy = new KunAnimationScene( this._name, this._cols,this._rows , this._fps , this._prefix );
     copy._current = this._current;
+    copy._frameSets = this._animationLayers;
     return copy.reset();
 };
-/**
- * @returns KunAnimationScene|Object
- */
 KunAnimationScene.prototype.dump = function(){
     return this;
 };
@@ -1754,7 +1644,7 @@ KunAnimationScene.prototype.dump = function(){
 KunAnimationScene.INVALID = new KunAnimationScene('INVALID');
 
 
-//function KunAnimationLayer(){ this.initialize.apply( this , arguments ); };
+function KunAnimationLayer(){ this.initialize.apply( this , arguments ); };
 //KunAnimationLayer.prototype = Object.create(Sprite.prototype);
 /**
  * 
@@ -1767,8 +1657,7 @@ KunAnimationScene.INVALID = new KunAnimationScene('INVALID');
  * @param {Number} offsetX
  * @param {Number} offsetY
  */
-//KunAnimationLayer.prototype.initialize = function( name , type , fps, loops , next , bank , offsetX , offsetY , clearTargets ){
-function KunAnimationLayer( name , type , fps, loops , next , bank , offsetX , offsetY , clearTargets ){
+KunAnimationLayer.prototype.initialize = function( name , type , fps, loops , next , bank , offsetX , offsetY ){
     this._name = name.toLowerCase().replace(/[\s\_]/,'-');
     this._fps = typeof fps === 'number' && fps > 0 ? fps : 0;
     this._frames = [];
@@ -1776,84 +1665,11 @@ function KunAnimationLayer( name , type , fps, loops , next , bank , offsetX , o
     this._loops = loops || 0;
     this._offsetX = offsetX || 0;
     this._offsetY = offsetY || 0;
-    this._clearTargets = typeof clearTargets === 'boolean' && clearTargets;
     this._spots = {
         //interactive spots to touch
     };
     this._next = Array.isArray( next ) ? next  : ( typeof next === 'string' && next.length ? [next] : [] );
     this._bank = Array.isArray(bank) ? bank : ( typeof bank === 'string' && bank.length ? [bank] : []) ;
-
-    this._actions = [
-        //add here all actions to run when this frameset plays
-    ];
-    this._conditions = [
-        //add here all conditions to run when this frameset plays
-    ];
-};
-/**
- * @param KunLayerAction action
- * @returns KunAnimationLayer
- */
-KunAnimationLayer.prototype.addAction = function( action ){
-    if( action instanceof KunLayerAction ){
-        this._actions.push( action );
-    }
-    return this;
-};
-/**
- * @returns KunLayerAction[]
- */
-KunAnimationLayer.prototype.actions = function(){
-    return this._actions;
-};
-/**
- * @returns KunAnimationLayer
- */
-KunAnimationLayer.prototype.runActions = function(){
-    //KunSceneManager.DebugLog(`Preparing ${this.actions().length.toString()} actions for layer ${this.name()}`);
-    this.actions().filter( action => action.canRun( ) ).forEach( action => action.run() );
-    return this;
-};
-/**
- * @param KunLayerCondition condition
- * @returns KunAnimationLayer
- */
-KunAnimationLayer.prototype.addCondition = function( condition ){
-    if( condition instanceof KunLayerCondition ){
-        this._conditions.push( condition );
-    }
-    return this;
-};
-/**
- * @returns KunLayerCondition[]
- */
-KunAnimationLayer.prototype.conditions = function(){
-    return this._conditions;
-};
-/**
- * @returns Boolean
- */
-KunAnimationLayer.prototype.isUnlocked = function(){
-    if( this.conditions().length ){
-        var notPassed = this.conditions().filter( condition => !condition.validate() );
-        //KunSceneManager.DebugLog( notPassed ? `${this.name()} didn't pass the validation` : `${this.name()} passed the validation!` );
-        return notPassed.length === 0;    
-    }
-    return true;
-};
-/**
- * 
- * @returns 
- */
-KunAnimationLayer.prototype.randomSpot = function(){
-    var list = this.spots(true);
-    return list[Math.floor( Math.random() * list.length)];
-};
-/**
- * @returns Boolean
- */
-KunAnimationLayer.prototype.clearTargetQueue = function( ){
-    return this._clearTargets;
 };
 /**
  * @returns Number
@@ -1952,8 +1768,7 @@ KunAnimationLayer.prototype.add = function( frame ){
  * @returns Number
  */
 KunAnimationLayer.prototype.fps = function(){
-    return this._fps;
-    //return this._fps > 0 ? this._fps : KunSceneManager.defaultFps();
+    return this._fps > 0 ? this._fps : KunSceneManager.defaultFps();
 };
 /**
  * @returns Number
@@ -1994,16 +1809,28 @@ KunAnimationLayer.prototype.name = function(){
     return this._name;
 };
 /**
- * @returns String[]
+ * @returns String
  */
-KunAnimationLayer.prototype.next = function(){
-    return this.nextLayers();
-};
+KunAnimationLayer.prototype.getNext = function(){
+    var next = this._next.length > 1 ? Math.floor( Math.random() * this._next.length ) : 0;    
+    return this._next.length > 0 ? this._next[ next ] : '';
+}
 /**
- * @returns String[]
+ * @param {String} prefix 
+ * @returns KunAnimationLayer
  */
-KunAnimationLayer.prototype.nextLayers = function(){
-    return this._next;
+KunAnimationLayer.prototype.prefixSoundBank = function( prefix ){
+    //this feature needs to be fixed, layers are shared as objects for each picture in the pack
+    return this;
+    if( typeof prefix === 'string' && prefix.length > 0 ){
+        for( var i = 0 ; i < this._bank.length ; i++ ){
+            console.log( prefix + '-' + this._bank[i]);
+            //this._bank[i] = prefix + '-' + this._bank[i];
+            //this._bank[i] = `${prefix}-${this._bank[i]}`;
+            //console.log( this._bank[i]) ;
+        }    
+    }
+    return this;
 };
 /**
  * @returns Boolean
@@ -2025,19 +1852,18 @@ KunAnimationLayer.prototype.selectSoundBank = function( prefix ){
 };
 /**
  * @param {String} prefix
- * @param {Number} round
  * @returns KunAnimationLayer
  */
-KunAnimationLayer.prototype.playBank = function( prefix , round ){
-    KunSceneManager.playBank( this.selectSoundBank( prefix ) , round );
+KunAnimationLayer.prototype.playBank = function( prefix ){
+    KunSceneManager.playBank( this.selectSoundBank( prefix ) );
     return this;
 };
 /**
  * @returns KunAnimationLayer
  */
-/*KunAnimationLayer.prototype.getSoundBank = function( ){
+KunAnimationLayer.prototype.getSoundBank = function( ){
     return KunSceneManager.soundBank( this.selectSoundBank() );
-};*/
+};
 
 /**
  * 
@@ -2078,23 +1904,6 @@ KunTouchEvent.prototype.toString = function(){
  */
 KunTouchEvent.prototype.name = function(){
     return this._name;
-};
-/**
- * @returns Object {x,y} coordinates of the selected spot
- */
-KunTouchEvent.prototype.generatePosition = function(){
-    var x = Math.floor(Math.random() * (this._x2 - this._x1)) + this._x1;
-    var y = Math.floor(Math.random() * (this._y2 - this._y1)) + this._y1;
-    return {
-        'x':x,
-        'y':y,
-    };
-};
-/**
- * @returns String[]
- */
-KunTouchEvent.prototype.nextLayers = function(){
-    return this._next;
 };
 /**
  * @returns String
@@ -2198,178 +2007,186 @@ KunTouchEvent.Behaviour = {
     'Set': 'set',
     'Frame': 'frame', //DEPRECATED
 };
+
+
 /**
- * Handle conditions to unlock available layers
- * @param {Number} gameVar 
- * @param {String} operation 
- * @param {Number} value 
+ * @param {String} name 
+ * @param {Number} chance
+ * @param {Boolean} interrupt
+ * @param {Number} round
  */
-function KunLayerCondition( gameVar , operation , value ){
-    this._gameVar = typeof gameVar === 'number' && gameVar > 0 ? gameVar : 0;
-    this._operator = typeof operation === 'string' && operation.length > 0 ? operation : KunLayerCondition.Operators().Equal;
-    this._value = typeof value === 'number' && value > 0 ? value : 1;
-};
-/**
- * @returns Number
- */
-KunLayerCondition.prototype.value = function( ){
-    return this._value;
-};
-/**
- * @param {Boolean} importGameVar 
- * @returns Number
- */
-KunLayerCondition.prototype.gameVar = function( importGameVar ){
-    return typeof importGameVar === 'boolean' && importGameVar ? $gameVariables.value(this.gameVar()) : this._gameVar;
+function KunSoundBank( name , chance , interrupt , round ){
+    this._name = name || '';
+    this._chance = chance || 100;
+    this._interrupt = typeof interrupt === 'boolean' && interrupt;
+    this._se = [];
+    this._volume = [];
+    this._pitch = [];
+    this._pan = [];
+    this._round = round || 0;
 };
 /**
  * @returns String
  */
-KunLayerCondition.prototype.operator = function( ){
-    return this._operator;
-};
-/**
- * @returns Boolean
- */
-KunLayerCondition.prototype.validate = function( ){
-    if( this.gameVar() > 0 ){
-        switch( this.operator()){
-            case KunLayerCondition.Operators.Greater:
-                return this.gameVar(true) > this.value();
-            case KunLayerCondition.Operators.GreaterOrEqual:
-                return this.gameVar(true) >= this.value();
-            case KunLayerCondition.Operators.Equal:
-                return this.gameVar(true) = this.value();
-            case KunLayerCondition.Operators.LowerOrEqual:
-                return this.gameVar(true) <= this.value();
-            case KunLayerCondition.Operators.Lower:
-                return this.gameVar(true) < this.value();
-        };    
-    }
-    return true;
-};
-/**
- * 
- */
-KunLayerCondition.Operators = {
-    'Greater': 'greater',
-    'GreaterOrEqual': 'greater_equal',
-    'Equal': 'equal',
-    'LowerOrEqual': 'lower_equal',
-    'Lower': 'lower',
-};
-
-/**
- * Define a set of actions for each layer upon playing
- * @param {Number} gameVar 
- * @param {String} operation 
- * @param {Number} value 
- * @param {Number[]} gameSwitchesOn 
- * @param {Number[]} gameSwitchesOff 
- * @param {Boolean} runOnce 
- */
-function KunLayerAction( gameVar , operation , value , gameSwitchesOn, gameSwitchesOff , runOnce ){
-
-    this._gameVar = typeof gameVar === 'number' && gameVar > 0 ? gameVar : 0;
-    this._operation = typeof operation === 'string' && operation.length ? operation : KunLayerAction.Operators.Add;
-    this._value = typeof value === 'number' && value > 0 ? value : 0;
-    this._switchOn = Array.isArray( gameSwitchesOn ) ? gameSwitchesOn.map( sw => parseInt( sw ) ) : [];
-    this._switchOff = Array.isArray( gameSwitchesOff ) ? gameSwitchesOff.map( sw => parseInt( sw ) ) : [];
-
-    this._runOnce = runOnce;
-    this._rounds = 0;
+KunSoundBank.prototype.toString = function(){
+    return this.name();
 };
 /**
  * @returns String
  */
-KunLayerAction.prototype.operation = function( ){
-    return this._operation;
-}
+KunSoundBank.prototype.name = function(){
+    return this._name;
+};
+/**
+ * @returns Number
+ */
+KunSoundBank.prototype.round = function(){
+    return this._round;
+};
 /**
  * @returns Boolean
  */
-KunLayerAction.prototype.canRun = function( ){
-    return this.rounds() < 1 || !this.runOnce();
-}
-/**
- * @returns Boolean
- */
-KunLayerAction.prototype.runOnce = function( ){
-    return this._runOnce;
-}
-/**
- * @returns Number
- */
-KunLayerAction.prototype.rounds = function( ){
-    return this._rounds;
-}
-/**
- * @returns KunLayerAction
- */
-KunLayerAction.prototype.run = function( ){
-    this._rounds++;
-    return this.updateGameVar().switchOff().switchOn();
-}
-/**
- * @param {Boolean} importValue import the Current Value of this game variable
- * @returns Number
- */
-KunLayerAction.prototype.gameVar = function( importValue ){
-    return typeof importValue === 'boolean' && importValue ? $gameVariables.value(this._gameVar) : this._gameVar;
-}
-/**
- * @returns Number
- */
-KunLayerAction.prototype.value = function( ){
-    return this._value;
-}
-/**
- * @returns KunLayerActions
- */
-KunLayerAction.prototype.updateGameVar = function(){
-    switch( this.operation() ){
-        case KunLayerAction.Operators.Add:
-            $gameVariables.setValue( this.gameVar() , this.gameVar( true ) + this.value());
-            break;
-        case KunLayerAction.Operators.Sub:
-            var current = this.gameVar( true );
-            $gameVariables.setValue( this.gameVar() , current - this.value() > 0 ? current - this.value() : 0);
-            break;
-            case KunLayerAction.Operators.Set:
-            $gameVariables.setValue( this.gameVar() , this.value());
-            break;
-    }
-    this._switchOn.forEach( function( gameSwitch ){
-        $gameSwitches.setValue(gameSwitch,true);
-    });
-    return this;
+KunSoundBank.prototype.interrupt = function(){
+    return this._interrupt && !KunSceneManager.canInterrupt();
 };
 /**
- * @returns KunLayerActions
+ * @returns Number
  */
-KunLayerAction.prototype.switchOn = function(){
-    this._switchOn.forEach( function( gameSwitch ){
-        $gameSwitches.setValue(gameSwitch,true);
-    });
-    return this;
-};
-/**
- * @returns KunLayerActions
- */
-KunLayerAction.prototype.switchOff = function(){
-    this._switchOff.forEach( function( gameSwitch ){
-        $gameSwitches.setValue(gameSwitch,false);
-    });
-    return this;
+KunSoundBank.prototype.chance = function( ){
+    return this._chance > Math.floor( Math.random() * 100 );
 };
 /**
  * 
+ * @param {String} se 
+ * @returns KunSoundBank
  */
-KunLayerAction.Operators = {
-    'Add': 'add',
-    'Sub': 'sub',
-    'Set': 'set',
+KunSoundBank.prototype.addSe = function( se ){
+    if( typeof se === 'string' && se.length ){
+        this._se.push( se );
+    }
+    return this;
 };
+/**
+ * @param {Number} vol 
+ * @returns KunSoundBank
+ */
+KunSoundBank.prototype.addVol = function( vol ){
+    if( typeof vol === 'number' && vol ){
+        this._volume.push(vol);
+    }
+    return this;
+};
+/**
+ * @param {Number} pitch 
+ * @returns KunSoundBank
+ */
+KunSoundBank.prototype.addPitch = function( pitch ){
+    if( typeof pitch === 'number' && pitch ){
+        this._pitch.push(pitch);
+    }
+    return this;
+};
+/**
+ * @param {Number} pan 
+ * @returns KunSoundBank
+ */
+KunSoundBank.prototype.addPan = function( pan ){
+    if( typeof pan === 'number' && pan ){
+        this._pan.push(pan);
+    }
+    return this;
+};
+/**
+ * @returns Number
+ */
+KunSoundBank.prototype.pan = function(){
+    switch( this._pan.length ){
+        case 0: return 0;
+        case 1: return this._pan[0];
+        case 2:
+            var min = this._pan[0] < this._pan[1] ? this._pan[0] : this._pan[1];
+            var max = this._pan[1] > this._pan[0] ? this._pan[1] : this._pan[0];
+            return min + Math.floor(Math.random() * (max - min ));
+        default:
+            return this._pan[ Math.floor(Math.random() * this._pan.length) ];
+    }
+};
+/**
+ * @returns Number
+ */
+KunSoundBank.prototype.pitch = function(){
+    switch( this._pitch.length ){
+        case 0: return 100;
+        case 1: return this._pitch[0];
+        case 2:
+            var min = this._pitch[0] < this._pitch[1] ? this._pitch[0] : this._pitch[1];
+            var max = this._pitch[1] > this._pitch[0] ? this._pitch[1] : this._pitch[0];
+            return min + Math.floor(Math.random() * (max - min ));
+        default:
+            return this._pitch[ Math.floor(Math.random() * this._pitch.length) ];
+    }
+};
+/**
+ * @returns Number
+ */
+KunSoundBank.prototype.volume = function(){
+    switch( this._volume.length ){
+        case 0: return 50;
+        case 1: return this._volume[0];
+        case 2:
+            var min = this._volume[0] < this._volume[1] ? this._volume[0] : this._volume[1];
+            var max = this._volume[1] > this._volume[0] ? this._volume[1] : this._volume[0];
+            return min + Math.floor(Math.random() * (max - min ));
+        default:
+            return this._volume[ Math.floor(Math.random() * this._volume.length) ];
+    }
+};
+/**
+ * @returns String
+ */
+KunSoundBank.prototype.select = function(){
+    switch( this._se.length ){
+        case 0: return '';
+        case 1: return this._se[0];
+        default: return this._se[ Math.floor(Math.random() * this._se.length)];
+    }
+};
+/**
+ * @returns KunSoundBank
+ */
+KunSoundBank.prototype.play = function(){
+    if( this.canPlay() && this.chance() ){
+        var selection = this.select();
+        if( selection.length ){
+            KunSceneManager.AudioManager( selection, this.volume(), this.pitch() , this.pan() , this.interrupt());
+        }    
+    }
+    return this;
+};
+/**
+ * @returns KunSoundBank
+ */
+KunSoundBank.prototype.playRound = function( round ){
+    if( this.canPlay() && this.round() > 0 && round % this.round() === 0 ){
+        this.play();
+    }
+    return this;
+};
+/**
+ * @returns Boolean
+ */
+KunSoundBank.prototype.canPlay = function(){
+    return this._se.length > 0;
+};
+/**
+ * 
+ * @returns KunSoundBank
+ */
+KunSoundBank.Empty = function(){
+    return new KunSoundBank('EMPTY');
+};
+
+
 /**
  * 
  */
@@ -2583,12 +2400,6 @@ function KunAnimations_SetupCommands(){
                         }
                     }
                     break;
-                case 'randomize':
-                    if( args.length > 1 ){
-                        var name = KunSceneManager.getAlias(args[1]);
-                        KunSceneManager.randomTarget( name );
-                    }
-                    break;
                 case 'pause':
                     if( args.length > 1 ){
                         KunSceneManager.stop( KunSceneManager.getAlias(args[1]) );
@@ -2614,14 +2425,14 @@ function KunAnimations_SetupCommands(){
                 case 'target':
                     KunSceneManager.target(args.length > 1 && args[1] === 'random');
                     break;
-                /*case 'play':
+                case 'play':
                     if( args.length > 1 ){
                         KunSceneManager.playBank(args[1]);
                         if( args.length > 2 ){
                             KunSceneManager.Wait( parseInt(args[2]) , args.length > 3 ? parseInt(args[3]) : 0 );
                         }
                     }
-                    break;*/
+                    break;
                 case 'interruption':
                     if( args.length > 1 ){
                         KunSceneManager.stopInterruption( args[1].toLowerCase() === 'on' );

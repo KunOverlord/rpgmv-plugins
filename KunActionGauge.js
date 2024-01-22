@@ -4,7 +4,7 @@
 /*:
  * @filename KunActionGauge.js
  * @author KUN
- * @version 1.4
+ * @version 1.6
  * @plugindesc Show an Action Gauge using assigned variables.
  * 
  * TODO: Override the $gameVariables.setValue method to implement a hook to count the selected variables
@@ -12,18 +12,18 @@
  * @help
  * 
  *  COMMANDS:
- *  KunActionGauge display name
+ *  KunActionGauge display name [location]
  *  KunActionGauge close [name]
  * 
  * 
  * @param debug
  * @text Debug
- * @type Boolean
+ * @type boolean
  * @default false
  * 
  * @param background
  * @text Gauge Background
- * @type Select
+ * @type select
  * @option None
  * @value 2
  * @option Dim
@@ -31,6 +31,14 @@
  * @option Window
  * @value 0
  * @default 0
+ * 
+ * @param weight
+ * @text Gauge Weight
+ * @desc Setup the gauge thickness
+ * @type number
+ * @min 8
+ * @max 48
+ * @default 12
  * 
  * 
  * @param profiles
@@ -99,21 +107,56 @@
  */
 var KUN = KUN || {};
 
-function KunActionGauge( ){
+function KunActionGauge( ){ throw new Error('This is a static class'); }
+/**
+ * 
+ */
+KunActionGauge.initialize = function(){
 
-    var _gauge = {
-        'debug': false,
-        'background': 0,
-        'profiles':{
-            //setup here all gauges
-        },
-        //setup window output
-        'window': null
+    var parameters = this.parameters();
+
+    this._debug = parameters.debug === 'true';
+    this._background = parseInt( parameters.background || 0);
+    this._weight = parseInt( parameters.weight || 12 );
+    this._profiles = {
+        //setup here all gauges
     };
+    //setup window output
+    //this._window = null;
 
-    this.Set = {
-        'Debug': debug => _gauge.debug = typeof debug === 'boolean' && debug,
-        'Background': background => _gauge.background = parseInt( background ),
+    return this.import( parameters.profiles.length > 0 ? JSON.parse(parameters.profiles) : [] );
+};
+/**
+ * @returns Object
+ */
+KunActionGauge.parameters = function(){
+    return PluginManager.parameters('KunActionGauge');
+};
+/**
+ * @param {Array} data 
+ * @returns KunActionGauge
+ */
+KunActionGauge.import = function( data ){
+        if( data.length ){
+            data.map( gauge => JSON.parse( gauge )).forEach( function( gauge ){
+                KunActionGauge.add(
+                    gauge.name,
+                    parseInt(gauge.valueVar),
+                    parseInt(gauge.targetVar),
+                    parseInt(gauge.color1),
+                    parseInt(gauge.color2),
+                    gauge.location);
+
+            });
+        }
+    return this;
+};
+
+    /**
+     * @returns Number
+     */
+    KunActionGauge.weight = function(){
+        return this._weight;
     };
 
     /**
@@ -125,27 +168,34 @@ function KunActionGauge( ){
      * @param {Number} color2 
      * @param {String} location 
      */
-    this.add = function( name , valueVar , targetVar , color1 , color2 , location ){
+    KunActionGauge.add = function( name , valueVar , targetVar , color1 , color2 , location ){
         name = name.toLowerCase().replace(/\-\s/,'_');
-        if( !_gauge.profiles.hasOwnProperty(name)){
-            _gauge.profiles[ name ] = {
+        if( !this._profiles.hasOwnProperty(name)){
+            this._profiles[ name ] = {
                 'name': name,
                 'location': location || KunActionGauge.Location.BOTTOM,
                 'valueVar': valueVar,
                 'targetVar': targetVar,
                 'color1': color1 || KunActionGauge.Color.Base,
                 'color2': color2 || KunActionGauge.Color.Overlay,
-                //'active': false,
                 'window': null,
             };
         }
     };
-
-    this.has = gauge => _gauge.profiles.hasOwnProperty( gauge );
-
-    this.isActive = function( gauge ){
-        return this.has( gauge ) && _gauge.profiles[ gauge ].window !== null;
-        //return this.has( gauge ) && _gauge.profiles[ gauge ].active;
+    /**
+     * @param {String} gauge 
+     * @returns Boolean
+     */
+    KunActionGauge.has = function( gauge ){
+        return this._profiles.hasOwnProperty( gauge );
+    };
+    /**
+     * @param {String} gauge 
+     * @returns Boolean
+     */
+    KunActionGauge.isActive = function( gauge ){
+        return this.has( gauge ) && this._profiles[ gauge ].window !== null;
+        //return this.has( gauge ) && this._profiles[ gauge ].active;
     };
     /**
      * @param {String} location 
@@ -156,7 +206,7 @@ function KunActionGauge( ){
      * @param {Number} index 
      * @returns Window_ActionGauge
      */
-    this.createWindow = function( location , valueVar , targetVar , baseColor , overlayColor , index ){
+    KunActionGauge.createWindow = function( location , valueVar , targetVar , baseColor , overlayColor , index ){
         var _window = new Window_ActionGauge( location , valueVar , targetVar , baseColor , overlayColor , index );
         SceneManager._scene.addChild( _window );
         return _window;
@@ -164,19 +214,21 @@ function KunActionGauge( ){
     /**
      * @param {String} gauge 
      * @param {Boolean} active 
+     * @param {String} location
      * @returns KunActionGauge
      */
-    this.display = function( name , active ){
+    KunActionGauge.display = function( name , active , location ){
         if( this.has( name ) ){
-            var gauge = _gauge.profiles[ name ];
+            var gauge = this._profiles[ name ];
+            var position = KunActionGauge.ValidateLocation(location) ? location  : gauge.location;
             active = typeof active === 'boolean' && active;
             switch( true ){
                 case active && gauge.window === null: //show
                     gauge.window = this.createWindow(
-                        gauge.location,
+                        position,
                         gauge.valueVar, gauge.targetVar,
                         gauge.color1, gauge.color2,
-                        this.countByLocation( gauge.location )
+                        this.countByLocation( position )
                     );
                     break;
                 case !active && gauge.window !== null: //hide
@@ -190,7 +242,7 @@ function KunActionGauge( ){
     /**
      * @returns KunActionGauge
      */
-    this.closeAll = function(){
+    KunActionGauge.closeAll = function(){
         this.active().forEach( function( gauge ){
             gauge.window.close();
             gauge.window = null;
@@ -201,18 +253,20 @@ function KunActionGauge( ){
     /**
      * @returns Object[]
      */
-    this.gauges = () => Object.values( _gauge.profiles );
+    KunActionGauge.gauges = function(){
+        return Object.values( this._profiles );
+    };
     /**
      * @returns Object[]
      */
-    this.active = function(){
+    KunActionGauge.active = function(){
         return this.gauges().filter( gauge => gauge.window !== null );
     };
     /**
      * @param {Number} valueVar 
      * @returns 
      */
-    this.updateGauges = function( valueVar ){
+    KunActionGauge.updateGauges = function( valueVar ){
         this.gauges().filter( gauge => gauge.window !== null && gauge.valueVar === valueVar ).forEach( function( gauge ){
             gauge.window.renderGauge();
         });
@@ -222,16 +276,13 @@ function KunActionGauge( ){
      * @param {string} location 
      * @returns Number
      */
-    this.countByLocation = function( location ){
+    KunActionGauge.countByLocation = function( location ){
         return this.gauges().filter( gauge => gauge.location === location && gauge.window !== null ).length;
     };
 
-    this.dump = () => _gauge;
-    this.debug = () => _gauge.debug;
-    this.background = () => _gauge.background;
-
-    return this;
-}
+    KunActionGauge.dump = function(){ return _gauge; }
+    KunActionGauge.debug = function(){ return this._debug; };
+    KunActionGauge.background = function(){ return this._background; };
 
 KunActionGauge.Color = {
     'Base': 1,
@@ -246,10 +297,21 @@ KunActionGauge.Location = {
     'CENTER': 'center',
 };
 /**
- * @param {*} message 
+ * @param {String} position 
+ * @returns Boolean
+ */
+KunActionGauge.ValidateLocation = function( position ){
+    if( typeof position === 'string' && position.length ){
+        var locations = Object.keys( KunActionGauge.Location );
+        return locations.includes( position );    
+    }
+    return false;
+};
+/**
+ * @param {String|Object} message 
  */
 KunActionGauge.DebugLog = ( message ) =>{
-    if( KUN.ActionGauge.debug() ){
+    if( KunActionGauge.debug() ){
         if( typeof message === 'object' ){
             console.log( '[ KunActionGauge Object Data ] ');
             console.log( message );
@@ -298,7 +360,7 @@ Window_ActionGauge.prototype.initialize = function( location , valueVar , target
 
 Window_ActionGauge.prototype.initMembers = function() {
     this._imageReservationId = Utils.generateRuntimeId();
-    this._background = KUN.ActionGauge.background();
+    this._background = KunActionGauge.background();
     this._positionType = 2;
     this._waitCount = 0;
     this._faceBitmap = null;
@@ -306,59 +368,54 @@ Window_ActionGauge.prototype.initMembers = function() {
     
     //this.clearFlags();
 };
-
+/**
+ * @returns Number
+ */
 Window_ActionGauge.prototype.progress = function(){
     if( this._valueVar > 0 && this._targetVar > 0 ){
         var value = $gameVariables.value( this._valueVar );
         var target = $gameVariables.value( this._targetVar );
+        //console.log(`${value} / ${target}`);
         return target > 0 && value < target ? value / parseFloat( target ) : 1;
     }
     return 0;
 };
 
 Window_ActionGauge.prototype.renderGauge = function(){
-
     var color1 = this.textColor( this._baseColor );
     var color2 = this.textColor( this._overlayColor );
     var x = 0;
     var y = 0;
-    var rate = this.progress();
+    var progress = this.progress();
 
     switch( this._location ){
         case KunActionGauge.Location.TOP:
         case KunActionGauge.Location.BOTTOM:
         case KunActionGauge.Location.CENTER:
-            this.drawHorizontalGauge(
-                x,y,
-                (Graphics.boxWidth / 12) * 6,
-                rate , color1 , color2
-            );
+            this.drawHorizontalGauge( x,y, Window_ActionGauge.getGaugeWidth(), progress , color1 , color2 );
             break;
         case KunActionGauge.Location.LEFT:
         case KunActionGauge.Location.RIGHT:
-            this.drawVerticalGauge(
-                x,y,
-                (Graphics.boxHeight / 12)  * 6,
-                rate , color1 , color2
-            );
+            this.drawVerticalGauge( x,y, Window_ActionGauge.getGaugeHeight(), progress , color1 , color2 );
             break;
     }
-
 };
 
-Window_ActionGauge.getGaugeWeight = () => 12;
+Window_ActionGauge.getGaugeWidth = () => (Graphics.boxWidth / 12) * 6;
+Window_ActionGauge.getGaugeHeight = () => (Graphics.boxHeight / 12)  * 6;
+Window_ActionGauge.getGaugeWeight = () => KunActionGauge.weight();
 
 Window_ActionGauge.getLocationWidth = function( location ){
     switch( location ){
         case KunActionGauge.Location.TOP:
         case KunActionGauge.Location.BOTTOM:
         case KunActionGauge.Location.CENTER:
-            return (Graphics.boxWidth / 12) * 6;
+            return Window_ActionGauge.getGaugeWidth();
         case KunActionGauge.Location.RIGHT:
         case KunActionGauge.Location.LEFT:
             return Window_ActionGauge.getGaugeWeight() * 2;
     }
-    return 0;
+    return Window_ActionGauge.getGaugeWidth();
 };
 Window_ActionGauge.getLocationHeight = function(location ){
     switch( location ){
@@ -368,7 +425,7 @@ Window_ActionGauge.getLocationHeight = function(location ){
             return Window_ActionGauge.getGaugeWeight() * 2;
         case KunActionGauge.Location.RIGHT:
         case KunActionGauge.Location.LEFT:
-            return (Graphics.boxHeight / 12) * 6;
+            return Window_ActionGauge.getGaugeHeight();
     }
     return 0;
 };
@@ -417,6 +474,9 @@ Window_ActionGauge.prototype.drawVerticalGauge = function(x, y, height, progress
     this.contents.gradientFillRect( x, y + height - progressBar, weight, progressBar, color1, color2);
 };
 
+Window_ActionGauge.prototype.standardFontSize = () => Window_ActionGauge.getGaugeWeight();
+Window_ActionGauge.prototype.standardPadding = () => Window_ActionGauge.getGaugeWeight() / 2;
+Window_ActionGauge.prototype.textPadding = () => Window_ActionGauge.getGaugeWeight() / 2;
 
 /********************************************************************************************************************
  * 
@@ -424,22 +484,6 @@ Window_ActionGauge.prototype.drawVerticalGauge = function(x, y, height, progress
  * 
  *******************************************************************************************************************/
 
-function KunActionGauge_ImportGauges( data ){
-    var output = [];
-    if( data.length ){
-        JSON.parse( data ).map( gauge => JSON.parse( gauge )).forEach( function( gauge ){
-            output.push({
-                'name': gauge.name,
-                'location': gauge.location,
-                'valueVar': parseInt( gauge.valueVar ),
-                'targetVar': parseInt( gauge.targetVar ),
-                'color1': parseInt( gauge.color1 ),
-                'color2': parseInt( gauge.color2 ),
-            });
-        });
-    }
-    return output;
-};
 /**
  * 
  */
@@ -454,12 +498,7 @@ function KunActionGauge_HookVariables(){
             this._data[variableId] = value;
             this.onChange();
         }
-
-        KUN.ActionGauge.updateGauges( variableId );
-        //override
-        /*if( variableId === KUN.ActionGauge.value() ){
-            KUN.ActionGauge.update();
-        }*/
+        KunActionGauge.updateGauges( variableId );
     };
 }
 /**
@@ -474,15 +513,15 @@ function KunActionGauge_SetupCommands(){
                 switch (args[0]) {
                     case 'display':
                         if( args.length > 1 ){
-                            KUN.ActionGauge.display( args[1] , true );
+                            KunActionGauge.display( args[1] , true , args.length > 2 ? args[2] : '');
                         }
                         break;
                     case 'close':
                         if( args.length > 1 ){
-                            KUN.ActionGauge.display( args[1] , false );
+                            KunActionGauge.display( args[1] , false );
                         }
                         else{
-                            KUN.ActionGauge.closeAll();
+                            KunActionGauge.closeAll();
                         }
                         break;
                 }
@@ -503,21 +542,11 @@ function KunActionGauge_SetupCommands(){
 
 (function( /* args */ ){
 
-    var parameters = PluginManager.parameters('KunActionGauge');
-    KUN.ActionGauge = new KunActionGauge();
-    KUN.ActionGauge.Set.Debug( Boolean(parameters.debug) );
-    KUN.ActionGauge.Set.Background( parameters.background );
-
-    KunActionGauge_ImportGauges(parameters.profiles).forEach( function( gauge ){
-        KUN.ActionGauge.add( gauge.name,gauge.valueVar,gauge.targetVar,gauge.color1,gauge.color2,gauge.location);
-    });
-
+    KunActionGauge.initialize();
     //KunActionGauge.DebugLog( 'ready!' );
     KunActionGauge_HookVariables();
     //OVERRIDE COMMAND INTERPRETER
     KunActionGauge_SetupCommands();
-
-
 
 })( /* initializer */);
 

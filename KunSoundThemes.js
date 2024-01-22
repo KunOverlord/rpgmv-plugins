@@ -1,9 +1,9 @@
 //=============================================================================
-// KunAmbientFX.js
+// KunSoundThemes.js
 //=============================================================================
 /*:
- * @plugindesc Kun Dynamic Ambient SFX
- * @filename KunAmbientFX.js
+ * @plugindesc Kun Dynamic Music, Ambient and SFX Themes
+ * @filename KunSoundThemes.js
  * @version 1.52
  * @author KUN
  * 
@@ -11,9 +11,9 @@
  * 
  * COMMANDS:
  * 
- *      KunAmbientFX play theme [transition]
+ *      KunSoundThemes play theme [transition]
  *          Play a theme, use transition if required
- *      KunAmbientFX stop theme
+ *      KunSoundThemes stop theme
  *          Stop a playing theme
  * 
  * 
@@ -27,7 +27,7 @@
  * @type string
  * @text Preload Map Meta
  * @desc Capture Map meta with this tag, to activate a Sound Theme. Leave it in blank to disable
- * @default KunAmbientFx
+ * @default KunSoundThemes
  * 
  * @param fps
  * @text Elapsed FPS
@@ -134,13 +134,13 @@
 /**
  * 
  */
-function KunAmbientFX() {
+function KunSoundThemes() {
     throw `${this.constructor.name} is a Static Class`;
 };
 /**
- * @returns KunAmbientFX
+ * @returns KunSoundThemes
  */
-KunAmbientFX.Initialize = function () {
+KunSoundThemes.Initialize = function () {
 
     var parameters = this.importPluginData();
 
@@ -156,45 +156,45 @@ KunAmbientFX.Initialize = function () {
 /**
  * @returns Boolean
  */
-KunAmbientFX.mapMeta = function(){
+KunSoundThemes.mapMeta = function(){
     return this._mapMeta;
 };
 /**
  * @returns Boolean
  */
-KunAmbientFX.preloadMapMeta = function(){
+KunSoundThemes.preloadMapMeta = function(){
     return this.mapMeta().length > 0;
 };
 /**
  * @returns Object
  */
-KunAmbientFX.importPluginData = function () {
-    return PluginManager.parameters('KunAmbientFX');
+KunSoundThemes.importPluginData = function () {
+    return PluginManager.parameters('KunSoundThemes');
 };
 /**
  * @returns Boolean
  */
-KunAmbientFX.soundBanksLoaded = function () {
+KunSoundThemes.soundBanksLoaded = function () {
     return typeof KunSoundBanks === 'function';
 };
 /**
  * @returns Boolean
  */
-KunAmbientFX.debug = function () {
+KunSoundThemes.debug = function () {
     return this._debug;
 };
 /**
  * @param {Boolean} list 
  * @returns Array | Object
  */
-KunAmbientFX.themes = function (list) {
+KunSoundThemes.themes = function (list) {
     return typeof list === 'boolean' && list ? Object.values(this._themes) : this._themes;
 };
 /**
  * @param {KunSoundTheme} theme 
- * @returns KunAmbientFX
+ * @returns KunSoundThemes
  */
-KunAmbientFX.addTheme = function (theme) {
+KunSoundThemes.addTheme = function (theme) {
     if (!this.hasTheme(theme.name())) {
         this._themes[theme.name()] = theme;
     }
@@ -204,43 +204,43 @@ KunAmbientFX.addTheme = function (theme) {
  * @param {String} name 
  * @returns Boolean
  */
-KunAmbientFX.hasTheme = function (name) {
+KunSoundThemes.hasTheme = function (name) {
     return typeof name === 'string' && name.length > 0 && this._themes.hasOwnProperty(name);
 };
 /**
  * @returns KunSoundTheme
  */
-KunAmbientFX.current = function () {
+KunSoundThemes.current = function () {
     return this.hasTheme(this._selection) ? this.themes()[this._selection] : null;
 };
 /**
  * @returns Boolean
  */
-KunAmbientFX.isActive = function () {
+KunSoundThemes.isActive = function () {
     return this._selection.length > 0;
 };
 /**
  * @returns Boolean
  */
-KunAmbientFX.isRunning = function () {
+KunSoundThemes.isRunning = function () {
     return this.current() !== null; // ? this.isActive() : false;
 };
 /**
  * @returns Number
  */
-KunAmbientFX.waitFps = function () {
+KunSoundThemes.waitFps = function () {
     return this._fps;
 };
 /**
  * @returns Number
  */
-KunAmbientFX.elapsed = function () {
+KunSoundThemes.elapsed = function () {
     return this._fps - this._timer;
 };
 /**
  * @returns Boolean
  */
-KunAmbientFX.update = function () {
+KunSoundThemes.update = function () {
     if (this.isRunning()) {
         this._timer = ++this._timer % this.waitFps();
         if (this._timer === 0) {
@@ -257,48 +257,48 @@ KunAmbientFX.update = function () {
 /**
  * @param {String} selection 
  * @param {Boolean} transition false by default to play witout fadeout
- * @returns KunAmbientFX
+ * @returns KunSoundThemes
  */
-KunAmbientFX.play = function (selection, transition ) {
+KunSoundThemes.play = function (selection, transition ) {
     if (this.stop().hasTheme(selection)) {
         //change the theme selection
         this._selection = selection;
         //and restart with transition if required
         this.current().start(typeof transition === 'boolean' && transition);
-        KunAmbientFX.DebugLog(`Playing collection ${selection}`);
+        KunSoundThemes.DebugLog(`Playing collection ${selection}`);
     }
     return this;
 };
 /**
  * 
- * @returns KunAmbientFX
+ * @returns KunSoundThemes
  */
-KunAmbientFX.playFromMapMeta = function(){
+KunSoundThemes.playFromMapMeta = function(){
     var theme = this.importMapMeta();
     //play transsition at mapload to resume after map music setup
     return theme.length > 0 ? this.play( theme , true ) : this.stop();
 };
 /**
- * @returns KunAmbientFX
+ * @returns KunSoundThemes
  */
-KunAmbientFX.stop = function () {
+KunSoundThemes.stop = function () {
     if (this.isRunning()) {
         this.current().stop(true);
     }
     return this.clearSelection();
 };
 /**
- * @returns KunAmbientFX
+ * @returns KunSoundThemes
  */
-KunAmbientFX.clearSelection = function () {
+KunSoundThemes.clearSelection = function () {
     this._selection = '';
     return this;
 };
 /**
  * @param {Array} input 
- * @returns KunAmbientFX
+ * @returns KunSoundThemes
  */
-KunAmbientFX.importThemes = function (input) {
+KunSoundThemes.importThemes = function (input) {
     if (!Array.isArray(input)) {
         input = [];
     }
@@ -316,7 +316,7 @@ KunAmbientFX.importThemes = function (input) {
             .forEach(function (se) {
                 theme.add(new KunSfxPlayer(se.name, parseInt(se.min), parseInt(se.max)));
             });
-        KunAmbientFX.addTheme(theme);
+        KunSoundThemes.addTheme(theme);
     });
     return this;
 };
@@ -324,20 +324,20 @@ KunAmbientFX.importThemes = function (input) {
  * Show a notification message
  * @param {String} message 
  */
-KunAmbientFX.Notify = function (message) {
+KunSoundThemes.Notify = function (message) {
     if (typeof kun_notify === 'function') {
         kun_notify(message);
     }
-    else if (KunAmbientFX.debug()) {
-        KunAmbientFX.DebugLog(message);
+    else if (KunSoundThemes.debug()) {
+        KunSoundThemes.DebugLog(message);
     }
 };
 /**
  * @param {String} bank 
- * @returns KunAmbientFX
+ * @returns KunSoundThemes
  */
-KunAmbientFX.PlayBank = function (bank) {
-    if (KunAmbientFX.soundBanksLoaded()) {
+KunSoundThemes.PlayBank = function (bank) {
+    if (KunSoundThemes.soundBanksLoaded()) {
         KunSoundBanks.play(bank);
     }
     return this;
@@ -348,9 +348,9 @@ KunAmbientFX.PlayBank = function (bank) {
  * @param {Number} pitch 
  * @param {Number} pan 
  */
-KunAmbientFX.PlayBGS = function (media, volume, pitch, pan) {
+KunSoundThemes.PlayBGS = function (media, volume, pitch, pan) {
     if (typeof media === 'string' && media.length > 0) {
-        KunAmbientFX.DebugLog( `Playing BGS ${media}` );
+        KunSoundThemes.DebugLog( `Playing BGS ${media}` );
         AudioManager.playBgs({
             'name': media,
             'pan': pan || 0,
@@ -366,9 +366,9 @@ KunAmbientFX.PlayBGS = function (media, volume, pitch, pan) {
  * @param {Number} pitch 
  * @param {Number} pan 
  */
-KunAmbientFX.PlayBGM = function (media, volume, pitch, pan) {
+KunSoundThemes.PlayBGM = function (media, volume, pitch, pan) {
     if (typeof media === 'string' && media.length > 0) {
-        KunAmbientFX.DebugLog( `Playing BGM ${media}` );
+        KunSoundThemes.DebugLog( `Playing BGM ${media}` );
         AudioManager.playBgm({
             'name': media,
             'pan': pan || 0,
@@ -381,12 +381,12 @@ KunAmbientFX.PlayBGM = function (media, volume, pitch, pan) {
 /**
  * @returns String
  */
-KunAmbientFX.importMapMeta = function () {
+KunSoundThemes.importMapMeta = function () {
     var profiles = [];
     if ($dataMap !== null && $dataMap.hasOwnProperty('meta')) {
         Object.keys($dataMap.meta).forEach(function (meta) {
             var _type = meta.split(' ');
-            if (_type[0] === KunAmbientFX.mapMeta() && _type.length > 1) {
+            if (_type[0] === KunSoundThemes.mapMeta() && _type.length > 1) {
                 profiles.push(_type[1]);
             }
         });
@@ -396,13 +396,13 @@ KunAmbientFX.importMapMeta = function () {
 /**
  * @param {String|Object} message 
  */
-KunAmbientFX.DebugLog = function (message) {
-    if (KunAmbientFX.debug()) {
+KunSoundThemes.DebugLog = function (message) {
+    if (KunSoundThemes.debug()) {
         if (typeof message === 'object') {
-            console.log(`[ KunAmbientFX Debug ] ${message.toString()}`);
+            console.log(`[ KunSoundThemes Debug ] ${message.toString()}`);
         }
         else {
-            console.log(`[ KunAmbientFX Debug ] ${message}`);
+            console.log(`[ KunSoundThemes Debug ] ${message}`);
         }
     }
 };
@@ -560,20 +560,20 @@ KunSoundTheme.prototype.start = function ( fadeOut ) {
             this._transition = transition;
             this.stop(true);
         }
-        KunAmbientFX.DebugLog( `Transition to ${this.name()} started!!` );
+        KunSoundThemes.DebugLog( `Transition to ${this.name()} started!!` );
     }
     else {
         //abrupt transition and stop all playing media then restart banks and new theme
         this.stop();
         if (this.hasBgs() && !this.isPlayingBgs()) {
-            KunAmbientFX.PlayBGS(this.bgs(), this._bgs.volume, this._bgs.pitch, 0);
+            KunSoundThemes.PlayBGS(this.bgs(), this._bgs.volume, this._bgs.pitch, 0);
         }
         if (this.hasBgm() && !this.isPlayingBgm()) {
-            KunAmbientFX.PlayBGM(this.bgm(), this._bgm.volume, this._bgm.pitch, 0);
+            KunSoundThemes.PlayBGM(this.bgm(), this._bgm.volume, this._bgm.pitch, 0);
         }
         this._transition = 0;
         this._playing = true;
-        KunAmbientFX.DebugLog( `${this.name()} started!!` );
+        KunSoundThemes.DebugLog( `${this.name()} started!!` );
     }
     return this.effects(true).forEach(effect => effect.reset());
 };
@@ -664,27 +664,27 @@ KunSfxPlayer.prototype.update = function () {
  * @returns KunSfxPlayer
  */
 KunSfxPlayer.prototype.play = function () {
-    KunAmbientFX.PlayBank(this.name());
+    KunSoundThemes.PlayBank(this.name());
     return this;
 };
 
 /**
  * 
  */
-function KunAmbientFX_SetupCommands() {
+function KunSoundThemes_SetupCommands() {
     var _KunTouch_PluginCommand = Game_Interpreter.prototype.pluginCommand;
     Game_Interpreter.prototype.pluginCommand = function (command, args) {
         _KunTouch_PluginCommand.call(this, command, args);
-        if (command === 'KunAmbientFX') {
+        if (command === 'KunSoundThemes') {
             if (args && args.length) {
                 switch (args[0]) {
                     case 'play':
                         if (args.length > 1) {
-                            KunAmbientFX.play(args[1], args.length > 2 && args[2] === 'transition');
+                            KunSoundThemes.play(args[1], args.length > 2 && args[2] === 'transition');
                         }
                         break;
                     case 'stop':
-                        KunAmbientFX.stop();
+                        KunSoundThemes.stop();
                         break;
                 }
             }
@@ -694,31 +694,31 @@ function KunAmbientFX_SetupCommands() {
 /**
  *
  */
-function KunAmbientFX_SetupMap( preloadMeta ) {
-    var _KunAmbientFX_MapUpdate = Scene_Map.prototype.update;
+function KunSoundThemes_SetupMap( preloadMeta ) {
+    var _KunSoundThemes_MapUpdate = Scene_Map.prototype.update;
     Scene_Map.prototype.update = function () {
-        _KunAmbientFX_MapUpdate.call(this);
-        if (KunAmbientFX.isActive()) {
-            KunAmbientFX.update();
+        _KunSoundThemes_MapUpdate.call(this);
+        if (KunSoundThemes.isActive()) {
+            KunSoundThemes.update();
         }
     };
 
-    if( KunAmbientFX.preloadMapMeta() ){
+    if( KunSoundThemes.preloadMapMeta() ){
         //override by param
-        var _KunAmbientFX_SceneMap_IsReady = Scene_Map.prototype.isReady;
+        var _KunSoundThemes_SceneMap_IsReady = Scene_Map.prototype.isReady;
         /**
          * @returns Boolean
          */
         Scene_Map.prototype.isReady = function () {
-            if( _KunAmbientFX_SceneMap_IsReady.call(this)){
+            if( _KunSoundThemes_SceneMap_IsReady.call(this)){
                 
-                KunAmbientFX.playFromMapMeta();
+                KunSoundThemes.playFromMapMeta();
                 
                 return true;
             }
             return false;
         };
-        KunAmbientFX.DebugLog( `Preload sound themes with meta ${KunAmbientFX.mapMeta()}` );
+        KunSoundThemes.DebugLog( `Preload sound themes with meta ${KunSoundThemes.mapMeta()}` );
     }
 
 }
@@ -727,12 +727,12 @@ function KunAmbientFX_SetupMap( preloadMeta ) {
  * @returns Boolean
  */
 function kun_ambientfx_playing(bank) {
-    return KunAmbientFX.isRunning();
+    return KunSoundThemes.isRunning();
 }
 /**
  * 
  */
-function KunAmbientFX_AudioManager() {
+function KunSoundThemes_AudioManager() {
 
     AudioManager._kunSfxBuffers = [];
     AudioManager._kunSfxVolume = 100;
@@ -780,10 +780,10 @@ function KunAmbientFX_AudioManager() {
 
 (function ( /* args */) {
 
-    KunAmbientFX.Initialize();
-    KunAmbientFX_AudioManager();
-    KunAmbientFX_SetupMap( );
-    KunAmbientFX_SetupCommands();
+    KunSoundThemes.Initialize();
+    KunSoundThemes_AudioManager();
+    KunSoundThemes_SetupMap( );
+    KunSoundThemes_SetupCommands();
 
 })( /* initializer */);
 

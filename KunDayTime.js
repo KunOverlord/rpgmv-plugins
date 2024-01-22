@@ -64,20 +64,20 @@
  * 
  * @param syncRealTime
  * @text Sync Real Time
- * @type Boolean
+ * @type boolean
  * @desc Set the current System Time on each game load/newgame
  * @default false
+ * 
+ * @param mapMeta
+ * @text Map Meta
+ * @type string
+ * @desc Set the map meta to import a time profile
+ * @default KunDayTime
  * 
  * @param profiles
  * @text Daytime Profiles
  * @desc List here the colleciton of the timeset profiles
  * @type struct<Profile>[]
- * 
- * @param kunAmbientFx
- * @text KunAmbientFX Compatibility
- * @desc Play KunAmbientFx Ambient profile selection defined by tag
- * @type Boolean
- * @default false
  */
 /*~struct~Profile:
  * @param name
@@ -140,494 +140,333 @@
  * @param sfx
  * @text Ambient Fx profile
  * @type String
- * @desc requires KunAmbientFX
+ * @desc requires KunSoundThemes
  * 
  */
-
-/**
- * @description KUN Modules
- * @type KUN
- */
-var KUN = KUN || {};
-
-function KunDayTime(){
-
-    var _controller = {
-        'debug': false,
-        'variable': 0,
-        
-        'fps': 60,
-        'ticks':0,
-        'minutes': 60,
-        'displayMode': false,
-        'syncTime': false,
-        'kunAmbientFx':false,
-        'colorTones':[/* define here scene color tones */],
-        'current': '',
-        'profiles':{
-            //profiles
-        },
-    };
-
-    this.Set = {
-        'Debug': function( debug ){ _controller.debug = debug || false; },
-        'TimeVar': function( varId ){ _controller.variable = parseInt(varId) || 0; },
-        'Display24': function( display ){ _controller.displayMode = display; },
-        'SyncRealTime': function( sync ){ _controller.syncTime = sync || false; },
-        'AmbientFX': sfx => _controller.kunAmbientFx = typeof sfx === 'boolean' && sfx,
-    };
-    /**
-     * 
-     * @param {Number} fps 
-     * @param {Number} minutes 
-     * @returns KunDayTime
-     */
-    this.setFPS = function( fps , minutes ){
-        if( typeof fps === 'number' && fps ){
-            _controller.fps = parseInt( fps );
-        }
-        if( typeof minutes === 'number' && minutes ){
-            _controller.minutes = parseInt( minutes );
-        }
-        return this;
-    };
-    /**
-     * @returns {Boolean}
-     */
-    this.debug = () => _controller.debug;
-
-    this.dump = () => _controller;
-    /**
-     * @returns Boolean
-     */
-    this.kunAmbientFxSupport = () => _controller.kunAmbientFx;
-    /**
-     * @returns {KunDayTimeProfile}
-     */
-    this.getProfile = function(){
-        return _controller.current.length > 0 && this.profiles().hasOwnProperty(_controller.current) ? this.profiles()[_controller.current] : null;
-    };
-    /**
-     * @param {String} profile 
-     * @returns KunDayTime
-     */
-    this.setProfile = function( profile ){
-        _controller.current = typeof profile === 'string' && profile.length ? profile : '';
-        return this;
-    };
-    /**
-     * @returns KunDayTime
-     */
-    this.refresh = function() {
-        KunDayTime.stopAmbientFx();
-        this.updateTransition(this.getTime());
-        return this;
-    };
-    /**
-     * 
-     * @param {Boolean} list 
-     * @returns KunDayTimeProfile[] | Object
-     */
-    this.profiles = function( list ){
-        return typeof list === 'boolean' && list ? Object.values( _controller.profiles ) : _controller.profiles;
-    };
-    /**
-     * @returns {Boolean}
-     */
-    this.syncTime = () => _controller.syncTime;
-    /**
-     * @param {KunDayTimeProfile} profile 
-     * @returns KunDayTime
-     */
-    this.addProfile = function( profile ){
-        if( profile instanceof KunDayTimeProfile && !_controller.profiles.hasOwnProperty( profile.name( ) ) ){
-            _controller.profiles[profile.name()] = profile;
-        }
-        return this;
-    };
-    /**
-     * @param {Boolean} format
-     * @param {Boolean} showMinutes
-     * @returns Number
-     */
-    this.time = function( format , showMinutes ){
-        
-        var t = this.getTime();
-        
-        if( format ){
-            var h = t % this.getTimeFormat();
-            var part = this.getTimeFormat() < 24 ? (t > 11 ? 'pm' : 'am') : ' hs';
-            if( showMinutes && _controller.minutes > 0 ){
-                var m = this.getMinute();
-                //var m = parseInt( (_controller.ticks / _controller.minutes) * ( 60 / _controller.minutes ) ).toString().padStart(2,'0');
-                return `${h.toString().padStart(2,'0')} : ${m.toString().padStart(2,'0')} ${part}`;
-            }
-            else{
-                return `${h.toString().padStart(2,'0')} ${part}`;
-            }
-        }
-
-        return t;
-    };
-    /**
-     * @returns {KunDayTime}
-     */
-     this.updateTransition = function( time ){
-        var profile = this.getProfile();
-        //console.log( profile );
-        if( profile !== null ){
-            var colorTone = profile.createTransition( time );
-            KunDayTime.ScreenTint( colorTone , _controller.fpsTransition );
-            profile.playSfx( time );
-            if( _controller.debug ){
-                KunDayTime.DebugLog( `${profile.name()} profile ${time}hs RGBG[${colorTone.toString()}]` );
-            }
-        }
-        return this;
-    };
-    /**
-     * @returns Number
-     */
-    this.getTimeVar = () => _controller.variable;
-    /**
-     * @returns Number
-     */
-    this.getTime = () => $gameVariables.value( _controller.variable );
-    /**
-     * @returns Number
-     */
-    this.getMinute = () => _controller.minutes > 0 ? parseInt( (_controller.ticks / _controller.minutes) * ( 60 / _controller.minutes ) ) : 0;
-    /**
-     * @param {Number} hour if set, timer will be set to this hour, otherwise, it will increase the current time by 1 hour
-     * @returns {Number}
-     */
-    this.setTime = function( hour ){
-        var time = ( hour || this.getTime( ) + 1 ) % 24;
-        $gameVariables.setValue( _controller.variable , time );
-        return time;
-    };
-    /**
-     * @returns Number
-     */
-    this.getTimeFormat = () => _controller.displayMode ? 24 : 12;
-    /**
-     * @returns {KunDayTime}
-     */
-    this.next = function(){
-        if( _controller.variable > 0 ){
-            return this.updateTransition( this.setTime( ) );    
-        }
-        return this;
-    };
-    /**
-     * @returns Boolean
-     */
-    this.update = function(){
-        _controller.ticks = ++_controller.ticks % (_controller.fps * _controller.minutes);
-        if( _controller.ticks === 0 ){
-            this.next();
-            return true;
-        }
-        if( _controller.debug && _controller.ticks % _controller.minutes === 0 ){
-            KunDayTime.DebugLog(this.time(true,true));
-        }
-        return false;
-    };
-    /**
-     * @returns Number
-     */
-    this.getSystemHour = () => ( new Date() ).getHours();
-}
-/**
- * @param {String} name 
- * @returns 
- */
-function KunDayTimeProfile( name ){
-
-    var _profile = {
-        'name': name.toLowerCase().replace(/([\s\_]+)/g,'-'),
-        'timeSets':{},
-    };
-    /**
-     * @returns String
-     */
-    this.toString = () => _profile.name;
-    /**
-     * @returns String
-     */
-    this.name = () => _profile.name;
-    /**
-     * @param {String} tag 
-     * @returns Boolean
-     */
-    this.has = tag => typeof tag === 'string' && _profile.timeSets.hasOwnProperty( tag );
-    /**
-     * @param {Number} time 
-     * @returns Number
-     */
-    this.next = function( time ){
-        var ts = this.timeSets( true );
-        for(var i = 0; i < ts.length ; i++ ){
-            if( time < ts[i].time ){
-                return i;
-            }
-        }
-        return ts.length - 1;
-    }
-    /** 
-     * @param {Number} time 
-     * @returns STring
-     */
-    this.createTransition = function( time ){
-        
-        var ts = this.timeSets( true );
-
-        var t = this.next( time );
-        //console.log( `TRANSITION ${ts.toString()}  AT ${t}HS`) ;
-        if( t === 0 ){
-            //last to first
-            return this.exportTransition( ts[ts.length-1], ts[t], time);
-        }
-        else{
-            return this.exportTransition( ts[t-1] , ts[t], time );
-        }
-    };
-    /**
-     * @param {Object} from 
-     * @param {Object} to 
-     * @param {Number} time
-     * @returns Array [red , green, blue, gray ]
-     */
-    this.exportTransition = function( from , to , time ){
-        //console.log( `FROM ${from.toString()} TO ${to.toString()} AT ${time}` );
-        if( this.has( from.tag ) && this.has( to.tag ) ){
-            var _rate = Math.floor( this.createInterpolation( from.time , to.time , time ) * 100 ) / 100;
-            var _to = this.colorTone( to.tag );
-            var _from = this.colorTone( from.tag );
-            if( _rate > 0 ){
-                var mixed = [];
-                for( i = 0 ; i < _from.length ; i++ ){
-                    mixed.push( _to[ i ] - Math.floor( ( _to[i] - _from[i] ) * _rate ) );
-                }
-                return mixed;
-            }
-            else{
-                return _to;
-            }
-        }
-        return this.colorTone();
-    };
-    /**
-     * @param {Number} from 
-     * @param {Number} to 
-     * @param {Number} value 
-     * @returns 
-     */
-    this.createInterpolation = function( from , to , value ){
-        switch( true ){
-            case to - from === 0:
-                return 0;
-            case from > to && from > value:
-                return 1 - ( ( 24 + value ) - from ) / ( ( 24 + to ) - from );
-            case from > to:
-                return 1 - ( value - from ) / ( ( 24 + to ) - from );
-            default:
-                return 1 - ( value - from ) / ( to - from );
-        }
-    };
-    /**
-     * @param {String} tag
-     * @returns Number[] [r,g,b,g]
-     */
-    this.colorTone = function( tag ){
-        return this.has( tag ) ? [
-            _profile.timeSets[tag].red,
-            _profile.timeSets[tag].green,
-            _profile.timeSets[tag].blue,
-            _profile.timeSets[tag].gray,
-        ] : [0,0,0,0];
-    };
-    /**
-     * @param {Boolean} list 
-     * @returns Object[] | Object
-     */
-    this.timeSets = function( list ){
-        return typeof list === 'boolean' && list ? Object.values( _profile.timeSets ) : _profile.timeSets;
-    };
-    /**
-     * @returns Number
-     */
-    this.count = function(){
-        return this.timeSets(true).length;
-    };
-    /**
-     * Register a new timeset
-     * @param {String} tag 
-     * @param {Number} time 
-     * @param {Number} red 
-     * @param {Number} green 
-     * @param {Number} blue 
-     * @param {Number} gray 
-     * @param {String} sfx
-     * @returns KunDayTimeProfile
-     */
-    this.addTimeSet = function( tag , time , red, green, blue , gray , sfx ){
-
-        var _name = tag.toLowerCase().replace(/([\s\_]+)/g,'-');
-
-        var _lastTime = _profile.timeSets.length > 0 ? _profile.timeSets[_profile.timeSets.length-1].time : -1;
-
-        if( !_profile.timeSets.hasOwnProperty(_name ) && time > _lastTime ){
-            _profile.timeSets[_name] = {
-                'tag':_name,
-                'time': parseInt( time ),
-                'red': parseInt( red ),
-                'green': parseInt( green ),
-                'blue': parseInt( blue ),
-                'gray': parseInt( gray ),
-                'sfx': sfx || '',
-                'toString': function(){
-                    return this.tag;
-                }
-            };
-        } 
-
-        return this;
-    };
-    /**
-     * @param {Number} time 
-     * @returns KunDayTimeProfile
-     */
-    this.playSfx = function( time ){
-        if( this.count() > 0 ){
-            var sets = this.timeSets( true );
-            var sfx = sets
-                .filter( (ts) => ts.time <= time && ts.sfx.length > 0 )
-                .map( ts => ts.sfx );
-            
-            if( sfx.length === 0 ){
-                //no sound set? then try searching from the last
-                sfx = sets
-                    .filter( (ts) => ts.time > time && ts.sfx.length > 0 )
-                    .map( ts => ts.sfx );
-                    
-            }
-            sfx.reverse();
-
-            if( sfx.length > 0 ){
-                KunDayTime.playAmbientFx( sfx[0] );
-            }
-        }
-        return this;
-    };
-
-    return this;
+/******************************************************************************************************************
+ * Static Module
+ *****************************************************************************************************************/ 
+function KunDayTime() {
+    throw `${this.constructor.name} is a Static Class`;
 };
 /**
- * @param {Number} limit 
- * @param {String} profile 
- * @returns KunDayTimeController
+ * @returns KunDaytime Initializer
  */
-function KunDayTimeController( limit  ){
+KunDayTime.Initialize = function () {
 
+    var parameters = KunDayTime.importParameters();
+
+    this._debug = parameters.debug === 'true';
+    this._variable = parseInt(parameters.variable);
+    this._fps = parseInt(parameters.fps);
+    this._minutes = parseInt(parameters.minutes);
     this._ticks = 0;
-    this._limit = limit || 60;
-    this._minute = 0;
-    this._hour = 0;
-    /**
-     * @param {Number} timeVar 
-     * @param {Number} minuteVar 
-     * @returns KunDayTimeController
-     */
-    this.export = function( timeVar , minuteVar ){
-        if( typeof timeVar === 'number' && timeVar > 0 ){
-            $gameVariables.setValue( timeVar , this._hour );
-        }
-        if( typeof minuteVar === 'number' && minuteVar > 0 ){
-            $gameVariables.setValue( minuteVar , this._minute );
-        }
-        return this;
-    };
-    /**
-     * @returns Boolean
-     */
-    this.update = function(){
-        this._ticks = ( this._ticks + 1 ) % this._limit;
-        if( this._ticks === 0 ){
-            this._minute = ( this._minute + 1 ) % 60;
-            if( this._minute === 0 ){
-                this._hour = ( this._hour + 1 ) % 24;
-                return true;
-            }
-        }
-        return false;
+    this._displayMode = parseInt(parameters.display) === 24;
+    this._sycnTime = parameters.syncRealTime === 'true';
+    this._mapMeta = parameters.mapMeta || '';
+    this._current = '';
+    this._colorTomes = [];
+    this._profiles = {};
 
-    };
-
-    return this;
-}
-
-KunDayTime.kunAmbientFx = () => KUN.hasOwnProperty('AmbientFX');
+    return this.ImportProfiles(parameters.profiles.length > 0 ? JSON.parse(parameters.profiles) : []);
+};
 /**
- * KunAmbientFX integration plugin
- * @param {String} profile 
+ * @returns Object
  */
-KunDayTime.playAmbientFx = function( profile ){
-    if( profile.length > 0 && KunDayTime.kunAmbientFx() ){
-        KunDayTime.DebugLog(`Playing ${profile} selection ...`);
-        KUN.AmbientFX.stopAll();
-        if( KUN.AmbientFX.hasCollection( profile ) ){
-            KUN.AmbientFX.play( profile );
-        }
+KunDayTime.importParameters = function () {
+    return PluginManager.parameters('KunDayTime');
+};
+/**
+ * @param {Number} fps 
+ * @param {Number} minutes 
+ * @returns KunDayTime
+ */
+KunDayTime.setFPS = function (fps, minutes) {
+    if (typeof fps === 'number' && fps) {
+        this._fps = parseInt(fps);
     }
+    if (typeof minutes === 'number' && minutes) {
+        this._minutes = parseInt(minutes);
+    }
+    return this;
+};
+/**
+ * @returns {Boolean}
+ */
+KunDayTime.debug = function () {
+    return this._debug;
+};
+
+KunDayTime.dump = function () {
+    return _controller;
+};
+/**
+ * @returns Boolean
+ */
+KunDayTime.KunSoundThemes = function () {
+    return typeof KunSoundThemes === 'function';
+};
+/**
+ * @param {String} profile 
+ * @returns Boolean
+ */
+KunDayTime.hasProfile = function (profile) {
+    return typeof profile === 'string' && profile.length > 0 && this._profiles.hasOwnProperty(profile);
+};
+/**
+ * @returns {KunDayTimeProfile}
+ */
+KunDayTime.getProfile = function () {
+    return this.hasProfile(this._current) ? this.profiles()[this._current] : null;
+};
+/**
+ * @returns KunDayTime
+ */
+KunDayTime.clear = function(){
+    return this.stopSoundTheme();
+};
+/**
+ * @param {String} profile 
+ * @returns KunDayTime
+ */
+KunDayTime.setProfile = function (profile) {
+    this._current = this.hasProfile(profile) ? profile : '';
+    return this;
 };
 /**
  * 
  */
-KunDayTime.stopAmbientFx = function( ){
-    if( KunDayTime.kunAmbientFx() ){
-        KUN.AmbientFX.stopAll();
+KunDayTime.importMapProfile = function () {
+    if( this.hasMapMeta()){
+        KunDayTime.setProfile(this.importMapMeta()).refresh();
     }
+};
+/**
+ * @returns String
+ */
+KunDayTime.mapMeta = function(){
+    return this._mapMeta;
+};
+/**
+ * @returns Boolean
+ */
+KunDayTime.hasMapMeta = function(){
+    return this._mapMeta.length > 0;
+};
+/**
+ * @returns String
+ */
+KunDayTime.importMapMeta = function(){
+    if( this.hasMapMeta()){
+        var profiles = [];
+        if ($dataMap !== null && $dataMap.hasOwnProperty('meta')) {
+            Object.keys($dataMap.meta).forEach(function (meta) {
+                var _type = meta.split(' ');
+                if (_type[0] === KunDayTime.mapMeta() && _type.length > 1) {
+                    profiles.push(_type[1]);
+                }
+            });
+        }    
+        var selected = profiles.length > 1 ? Math.floor(Math.random() * profiles.length) : 0;
+        return profiles.length ? profiles[selected] : '';
+    }
+    return '';
+};
+/**
+ * @returns KunDayTime
+ */
+KunDayTime.refresh = function () {
+    return this.stopAmbientFx().updateTransition(this.getTime());
+};
+/**
+ * 
+ * @param {Boolean} list 
+ * @returns KunDayTimeProfile[] | Object
+ */
+KunDayTime.profiles = function (list) {
+    return typeof list === 'boolean' && list ? Object.values(this._profiles) : this._profiles;
+};
+/**
+ * @returns {Boolean}
+ */
+KunDayTime.syncTime = () => this._syncTime;
+/**
+ * @param {KunDayTimeProfile} profile 
+ * @returns KunDayTime
+ */
+KunDayTime.addProfile = function (profile) {
+    if (profile instanceof KunDayTimeProfile && !this._profiles.hasOwnProperty(profile.name())) {
+        this._profiles[profile.name()] = profile;
+    }
+    return this;
+};
+/**
+ * @param {Boolean} format
+ * @param {Boolean} showMinutes
+ * @returns Number
+ */
+KunDayTime.time = function (format, showMinutes) {
+
+    var t = this.getTime();
+
+    if (format) {
+        var h = t % this.getTimeFormat();
+        var part = this.getTimeFormat() < 24 ? (t > 11 ? 'pm' : 'am') : ' hs';
+        if (showMinutes && this._minutes > 0) {
+            var m = this.getMinute();
+            //var m = parseInt( (this._ticks / this._minutes) * ( 60 / this._minutes ) ).toString().padStart(2,'0');
+            return `${h.toString().padStart(2, '0')} : ${m.toString().padStart(2, '0')} ${part}`;
+        }
+        else {
+            return `${h.toString().padStart(2, '0')} ${part}`;
+        }
+    }
+
+    return t;
+};
+/**
+ * @returns {KunDayTime}
+ */
+KunDayTime.updateTransition = function (time) {
+    var profile = this.getProfile();
+    //console.log( profile );
+    if (profile !== null) {
+        var colorTone = profile.createTransition(time);
+        KunDayTime.ScreenTint(colorTone, this._fpsTransition);
+        profile.playSfx(time);
+        if (this._debug) {
+            KunDayTime.DebugLog(`${profile.name()} profile ${time}hs RGBG[${colorTone.toString()}]`);
+        }
+    }
+    return this;
+};
+/**
+ * @returns Number
+ */
+KunDayTime.getTimeVar = function () {
+    return this._variable;
+};
+/**
+ * @returns Number
+ */
+KunDayTime.getTime = function () {
+    return $gameVariables.value(this._variable);
+};
+/**
+ * @returns Number
+ */
+KunDayTime.getMinute = function () {
+    return this._minutes > 0 ? parseInt((this._ticks / this._minutes) * (60 / this._minutes)) : 0;
+};
+/**
+ * @param {Number} hour if set, timer will be set to this hour, otherwise, it will increase the current time by 1 hour
+ * @returns {Number}
+ */
+KunDayTime.setTime = function (hour) {
+    var time = (hour || this.getTime() + 1) % 24;
+    $gameVariables.setValue(this._variable, time);
+    return time;
+};
+/**
+ * @returns Number
+ */
+KunDayTime.getTimeFormat = function () {
+    return this._displayMode ? 24 : 12;
+};
+/**
+ * @returns {KunDayTime}
+ */
+KunDayTime.next = function () {
+    if (this._variable > 0) {
+        return this.updateTransition(this.setTime());
+    }
+    return this;
+};
+/**
+ * @returns Boolean
+ */
+KunDayTime.update = function () {
+    this._ticks = ++this._ticks % (this._fps * this._minutes);
+    if (this._ticks === 0) {
+        this.next();
+        return true;
+    }
+    if (this._debug && this._ticks % this._minutes === 0) {
+        KunDayTime.DebugLog(this.time(true, true));
+    }
+    return false;
+};
+/**
+ * @returns Number
+ */
+KunDayTime.getSystemHour = function () {
+    return (new Date()).getHours();
+};
+/**
+ * KunSoundThemes integration plugin
+ * @param {String} theme 
+ */
+KunDayTime.playSoundTheme = function (theme) {
+    if ( KunDayTime.KunSoundThemes()) {
+        KunSoundThemes.play( theme , true );
+        this.DebugLog(`Playing ${theme} selection ...`);
+    }
+};
+/**
+ * @returns {KunDayTime}
+ */
+KunDayTime.stopSoundTheme = function () {
+    if (KunDayTime.KunSoundThemes()) {
+        KunSoundThemes.stop();
+    }
+    return this;
 }
 /**
  * 
  * @param {Number[]} colorTone [ red , green , blue , gray ]
  * @param {*} frames frames to transition, 60 by default
+ * @returns {KunDayTime}
  */
-KunDayTime.ScreenTint = function( colorTone , frames ){
-    if( Array.isArray( colorTone ) && colorTone.length > 3 ){
-        $gameScreen.startTint( colorTone , frames || 60);
+KunDayTime.ScreenTint = function (colorTone, frames) {
+    if (Array.isArray(colorTone) && colorTone.length > 3) {
+        $gameScreen.startTint(colorTone, frames || 60);
     }
+    return this;
 };
-
-KunDayTime.DebugLog = function( message ){
-    if( KUN.DayTime.debug() ){
-        console.log( '[ KunDayTime Debug ] ' + message ); 
+/**
+ * @param {String|Object} message 
+ */
+KunDayTime.DebugLog = function (message) {
+    if (this.debug()) {
+        console.log('[ KunDayTime Debug ] ' + message);
     }
 }
+/**
+ * @param {String} message 
+ * @returns {KunDayTime}
+ */
+KunDayTime.Notify = function (message) {
 
-KunDayTime.Notify = function( message ){
-
-    if( typeof kun_notify === 'function' ){
-        kun_notify( message );
+    if (typeof kun_notify === 'function') {
+        kun_notify(message);
     }
-    else
-    {
-        KunDayTime.DebugLog( message );
+    else {
+        KunDayTime.DebugLog(message);
     }
+    return this;
 };
 
 /**
  * @param {String} input 
- * @returns 
+ * @returns Object[]
  */
-KunDayTime.ParseLayerColors = function( input ){
+KunDayTime.ParseLayerColors = function (input) {
 
     var output = [];
-    var layers = typeof input === "string" && input.length ? JSON.parse( input ) : [];
+    var layers = typeof input === "string" && input.length ? JSON.parse(input) : [];
 
-    for( var i = 0 ; i < layers.length ; i++ ){
-        var lc = JSON.parse( layers[ i ] );
+    for (var i = 0; i < layers.length; i++) {
+        var lc = JSON.parse(layers[i]);
         output.push({
             'time': parseInt(lc.time),
             'red': parseInt(lc.red),
@@ -640,75 +479,302 @@ KunDayTime.ParseLayerColors = function( input ){
     return output;
 };
 /**
- * @param {String} data 
+ * @param {String} input 
+ * @returns {KunDayTime}
+ */
+KunDayTime.ImportProfiles = function (input) {
+    if (Array.isArray(input)) {
+        input.filter(tpl => tpl.length > 0).map(tpl => JSON.parse(tpl)).forEach(function (tpl) {
+            var profile = new KunDayTimeProfile(tpl.name);
+            (tpl.timeSets.length > 0 ? JSON.parse(tpl.timeSets).map(ts => JSON.parse(ts)) : [ /* empty */]).forEach(function (ts) {
+                profile.addTimeSet(
+                    ts.tag,
+                    parseInt(ts.time),
+                    parseInt(ts.red),
+                    parseInt(ts.green),
+                    parseInt(ts.blue),
+                    parseInt(ts.gray),
+                    ts.sfx);
+            });
+            if (profile) {
+                KunDayTime.addProfile(profile);
+            }
+        });
+    }
+    return this;
+};
+
+
+/******************************************************************************************************************
+ * @param {String} name 
+ * @returns KunDayTimeProfile
+ *****************************************************************************************************************/
+function KunDayTimeProfile(name) {
+
+    this._name = name.toLowerCase().replace(/([\s\_]+)/g, '-');
+    this._timeSets = {};
+
+    return this;
+};
+/**
+ * @returns String
+ */
+KunDayTimeProfile.prototype.toString = function () {
+    return this.name();
+};
+/**
+ * @returns String
+ */
+KunDayTimeProfile.prototype.name = function () {
+    return this._name;
+};
+/**
+ * @param {String} tag 
+ * @returns Boolean
+ */
+KunDayTimeProfile.prototype.has = function (tag) {
+    return typeof tag === 'string' && this._timeSets.hasOwnProperty(tag);
+};
+/**
+ * @param {Number} time 
+ * @returns Number
+ */
+KunDayTimeProfile.prototype.next = function (time) {
+    var ts = this.timeSets(true);
+    for (var i = 0; i < ts.length; i++) {
+        if (time < ts[i].time) {
+            return i;
+        }
+    }
+    return ts.length - 1;
+}
+/** 
+ * @param {Number} time 
+ * @returns STring
+ */
+KunDayTimeProfile.prototype.createTransition = function (time) {
+
+    var ts = this.timeSets(true);
+
+    var t = this.next(time);
+    //console.log( `TRANSITION ${ts.toString()}  AT ${t}HS`) ;
+    if (t === 0) {
+        //last to first
+        return this.exportTransition(ts[ts.length - 1], ts[t], time);
+    }
+    else {
+        return this.exportTransition(ts[t - 1], ts[t], time);
+    }
+};
+/**
+ * @param {Object} from 
+ * @param {Object} to 
+ * @param {Number} time
+ * @returns Array [red , green, blue, gray ]
+ */
+KunDayTimeProfile.prototype.exportTransition = function (from, to, time) {
+    //console.log( `FROM ${from.toString()} TO ${to.toString()} AT ${time}` );
+    if (this.has(from.tag) && this.has(to.tag)) {
+        var _rate = Math.floor(this.createInterpolation(from.time, to.time, time) * 100) / 100;
+        var _to = this.colorTone(to.tag);
+        var _from = this.colorTone(from.tag);
+        if (_rate > 0) {
+            var mixed = [];
+            for (i = 0; i < _from.length; i++) {
+                mixed.push(_to[i] - Math.floor((_to[i] - _from[i]) * _rate));
+            }
+            return mixed;
+        }
+        else {
+            return _to;
+        }
+    }
+    return this.colorTone();
+};
+/**
+ * @param {Number} from 
+ * @param {Number} to 
+ * @param {Number} value 
  * @returns 
  */
-KunDayTime.ImportProfiles = function( data ){
+KunDayTimeProfile.prototype.createInterpolation = function (from, to, value) {
+    switch (true) {
+        case to - from === 0:
+            return 0;
+        case from > to && from > value:
+            return 1 - ((24 + value) - from) / ((24 + to) - from);
+        case from > to:
+            return 1 - (value - from) / ((24 + to) - from);
+        default:
+            return 1 - (value - from) / (to - from);
+    }
+};
+/**
+ * @param {String} tag
+ * @returns Number[] [r,g,b,g]
+ */
+KunDayTimeProfile.prototype.colorTone = function (tag) {
+    return this.has(tag) ? [
+        this._timeSets[tag].red,
+        this._timeSets[tag].green,
+        this._timeSets[tag].blue,
+        this._timeSets[tag].gray,
+    ] : [0, 0, 0, 0];
+};
+/**
+ * @param {Boolean} list 
+ * @returns Object[] | Object
+ */
+KunDayTimeProfile.prototype.timeSets = function (list) {
+    return typeof list === 'boolean' && list ? Object.values(this._timeSets) : this._timeSets;
+};
+/**
+ * @returns Number
+ */
+KunDayTimeProfile.prototype.count = function () {
+    return this.timeSets(true).length;
+};
+/**
+ * Register a new timeset
+ * @param {String} tag 
+ * @param {Number} time 
+ * @param {Number} red 
+ * @param {Number} green 
+ * @param {Number} blue 
+ * @param {Number} gray 
+ * @param {String} sfx
+ * @returns KunDayTimeProfile
+ */
+KunDayTimeProfile.prototype.addTimeSet = function (tag, time, red, green, blue, gray, sfx) {
 
-    var output = [];
-    (typeof data === "string" && data.length ? JSON.parse( data ) : []).map( profile => JSON.parse(profile)).forEach( function( profile ){
+    var _name = tag.toLowerCase().replace(/([\s\_]+)/g, '-');
 
-        var timeSets = [];
-        (profile.timeSets.length > 0 ? JSON.parse(profile.timeSets).map( ts => JSON.parse(ts) ) : [ /* empty */ ]).forEach( function( ts ){
-            timeSets.push({
-                    'tag': ts.tag,
-                    'time': parseInt( ts.time ),
-                    'red': parseInt( ts.red ),
-                    'green': parseInt( ts.green ),
-                    'blue': parseInt( ts.blue ),
-                    'gray': parseInt( ts.gray ),
-                    'sfx': ts.sfx ,
-            });
-        });
+    var _lastTime = this._timeSets.length > 0 ? this._timeSets[this._timeSets.length - 1].time : -1;
 
-        if( timeSets.length ){
-            output.push({
-                'name':profile.name,
-                'timeSets': timeSets,
-            });
+    if (!this._timeSets.hasOwnProperty(_name) && time > _lastTime) {
+        this._timeSets[_name] = {
+            'tag': _name,
+            'time': parseInt(time),
+            'red': parseInt(red),
+            'green': parseInt(green),
+            'blue': parseInt(blue),
+            'gray': parseInt(gray),
+            'sfx': sfx || '',
+            'toString': function () {
+                return this.tag;
+            }
+        };
+    }
+
+    return this;
+};
+/**
+ * @param {Number} time 
+ * @returns KunDayTimeProfile
+ */
+KunDayTimeProfile.prototype.playSfx = function (time) {
+    if (this.count() > 0) {
+        var sets = this.timeSets(true);
+        var sfx = sets
+            .filter((ts) => ts.time <= time && ts.sfx.length > 0)
+            .map(ts => ts.sfx);
+
+        if (sfx.length === 0) {
+            //no sound set? then try searching from the last
+            sfx = sets
+                .filter((ts) => ts.time > time && ts.sfx.length > 0)
+                .map(ts => ts.sfx);
+
         }
-    });
-    return output;
+        sfx.reverse();
+
+        if (sfx.length > 0) {
+            KunDayTime.playSoundTheme(sfx[0]);
+        }
+    }
+    return this;
+};
+/******************************************************************************************************************
+ * @param {Number} limit 
+ * @param {String} profile 
+ * @returns KunDayTimeController
+ *****************************************************************************************************************/
+function KunDayTimeController(limit) {
+
+    this._ticks = 0;
+    this._limit = limit || 60;
+    this._minute = 0;
+    this._hour = 0;
+
+    return this;
+}
+/**
+ * @param {Number} timeVar 
+ * @param {Number} minuteVar 
+ * @returns KunDayTimeController
+ */
+KunDayTimeController.prototype.export = function (timeVar, minuteVar) {
+    if (typeof timeVar === 'number' && timeVar > 0) {
+        $gameVariables.setValue(timeVar, this._hour);
+    }
+    if (typeof minuteVar === 'number' && minuteVar > 0) {
+        $gameVariables.setValue(minuteVar, this._minute);
+    }
+    return this;
+};
+/**
+ * @returns Boolean
+ */
+KunDayTimeController.prototype.update = function () {
+    this._ticks = (this._ticks + 1) % this._limit;
+    if (this._ticks === 0) {
+        this._minute = (this._minute + 1) % 60;
+        if (this._minute === 0) {
+            this._hour = (this._hour + 1) % 24;
+            return true;
+        }
+    }
+    return false;
 };
 
 /**
  * 
  */
-KunDayTime.SetupCommands = function(){
+function KunDayTime_SetupCommands() {
     //override vanilla
     var GameInterpreterPluginCommand = Game_Interpreter.prototype.pluginCommand;
-    Game_Interpreter.prototype.pluginCommand = function(command, args) {
+    Game_Interpreter.prototype.pluginCommand = function (command, args) {
         GameInterpreterPluginCommand.call(this, command, args);
-        if( command === 'KunDayTime' ){
+        if (command === 'KunDayTime') {
             //override with plugin command manager
-            if( args.length ){
+            if (args.length) {
                 switch (args[0]) {
                     case 'timeFrame':
-                        var fps = args.length > 1 ? parseInt( args[1] ) : 60;
-                        var minutes = args.length > 2 ? parseInt( args[2] ) : 0;
-                        if( args.length > 3 && args[3] === 'import' ){
+                        var fps = args.length > 1 ? parseInt(args[1]) : 60;
+                        var minutes = args.length > 2 ? parseInt(args[2]) : 0;
+                        if (args.length > 3 && args[3] === 'import') {
                             fps = $gameVariables.value(fps);
                             minutes = $gameVariables.value(minutes);
                         }
-                        KUN.DayTime.setFPS( fps , minutes );
+                        KunDayTime.setFPS(fps, minutes);
                         break;
                     case 'set':
-                        if( args.length > 1 ){
-                            var time = args[1] === 'system' ? KUN.DayTime.getSystemHour() : (  !Number.isNaN(args[1]) ? parseInt( args[1]) : 0 );
-                            KUN.DayTime.updateTransition(KUN.DayTime.setTime( time ));
+                        if (args.length > 1) {
+                            var time = args[1] === 'system' ? KunDayTime.getSystemHour() : (!Number.isNaN(args[1]) ? parseInt(args[1]) : 0);
+                            KunDayTime.updateTransition(KunDayTime.setTime(time));
                         }
                         break;
                     case 'debug':
-                        KUN.DayTime.Set.Debug( !KUN.DayTime.debug() );
+                        KunDayTime.Set.Debug(!KunDayTime.debug());
                         break;
                     case 'start':
-                        KUN.DayTime.run()
+                        KunDayTime.run()
                         break;
                     case 'stop':
-                        KUN.DayTime.stopTimer()
+                        KunDayTime.stopTimer()
                         break;
                     case 'forceUpdate':
-                        KUN.DayTime.refresh();
+                        KunDayTime.refresh();
                         break;
                 }
             }
@@ -718,42 +784,53 @@ KunDayTime.SetupCommands = function(){
 /**
  * 
  */
-KunDayTime.SetupSceneMap = function(){
+function KunDayTime_SetupSceneMap() {
+    var _KunDayTime_Scene_Map_Ready =  Scene_Map.prototype.isReady;
     /**
      * @returns Boolean
      */
-    Scene_Map.prototype.isReady = function() {
-        if (!this._mapLoaded && DataManager.isMapLoaded()) {
+    Scene_Map.prototype.isReady = function () {
+        // stop any residual content before playing the new map
+        //maybe should be posted on map unloading events
+        KunDayTime.clear(); 
+        if( _KunDayTime_Scene_Map_Ready.call(this) ){
+            //OVERRIDE
+            KunDayTime.importMapProfile();
+            //KunDayTime.setProfile(this.importMapProfile()).refresh();
+            return true;
+        }
+        return false;
+
+        //VANILLA CODE
+        /*if (!this._mapLoaded && DataManager.isMapLoaded()) {
             this.onMapLoaded();
             this._mapLoaded = true;
 
-            //OVERRIDE
-            KUN.DayTime.setProfile( this.importMapProfile( ) ).refresh();
         }
-        return this._mapLoaded && Scene_Base.prototype.isReady.call(this);
+        return this._mapLoaded && Scene_Base.prototype.isReady.call(this);*/
     };
     /**
      * @returns String
      */
-    Scene_Map.prototype.importMapProfile = function(){
+    Scene_Map.prototype.importMapProfile = function () {
         var profiles = [];
-        if( $dataMap !== null && $dataMap.hasOwnProperty('meta')){
-            Object.keys( $dataMap.meta ).forEach( function( meta ){
+        if ($dataMap !== null && $dataMap.hasOwnProperty('meta')) {
+            Object.keys($dataMap.meta).forEach(function (meta) {
                 var _type = meta.split(' ');
-                if( _type[ 0 ] === 'KunDayTime' && _type.length > 1 ){
-                    profiles.push( _type[1] );
+                if (_type[0] === 'KunDayTime' && _type.length > 1) {
+                    profiles.push(_type[1]);
                 }
             });
         }
         var selected = profiles.length > 1 ? Math.floor(Math.random() * profiles.length) : 0;
-        return profiles.length ? profiles[ selected ] : '';
+        return profiles.length ? profiles[selected] : '';
     }
-    
-    var _KunDayTime_MapUpdate = Scene_Map.prototype.update;
-    Scene_Map.prototype.update = function( ) {
-        _KunDayTime_MapUpdate.call( this  );
 
-        if( KUN.DayTime.update() ){
+    var _KunDayTime_MapUpdate = Scene_Map.prototype.update;
+    Scene_Map.prototype.update = function () {
+        _KunDayTime_MapUpdate.call(this);
+
+        if (KunDayTime.update()) {
             //update the DayTimeController
             //
         }
@@ -762,58 +839,32 @@ KunDayTime.SetupSceneMap = function(){
 /**
  * 
  */
-KunDayTime.SetupEscapeChars = function(){
+function KunDayTime_SetupEscapeChars() {
     var _ConvertEscapeCharactersOriginal = Window_Base.prototype.convertEscapeCharacters;
     Window_Base.prototype.convertEscapeCharacters = function (text) {
         //parse first the vanilla strings
         var parsed = _ConvertEscapeCharactersOriginal.call(this, text);
-    
+
         //return the current special message
         parsed = parsed.replace(/\x1bTIME/gi, function () {
-            return KUN.DayTime.time( true );
+            return KunDayTime.time(true);
         }.bind(this));
-        
+
         //return the current special message
         parsed = parsed.replace(/\x1bFULL_TIME/gi, function () {
-            return KUN.DayTime.time( true , true );
+            return KunDayTime.time(true, true);
         }.bind(this));
-        
+
         return parsed;
-    };    
+    };
 };
 
 /* PLUGIN SETUP */
-(function(){
-    var parameters = PluginManager.parameters('KunDayTime');
-
-    //console.log( KUN.SpecialDates);
-    KUN.DayTime = new KunDayTime();
-    KUN.DayTime.Set.Debug( parameters.debug === 'true' );
-    KUN.DayTime.Set.TimeVar( parseInt(parameters.variable ) );
-    KUN.DayTime.setFPS( parameters.fps , parameters.minutes );
-    KUN.DayTime.Set.Display24( parseInt(parameters.display) === 24 );
-    KUN.DayTime.Set.SyncRealTime( parameters.syncRealTime === 'true' );
-    KUN.DayTime.Set.AmbientFX( parameters.kunAmbientFx === 'true' );
-    
-    KunDayTime.ImportProfiles( parameters.profiles ).forEach( function( profile ){
-        var _profile = new KunDayTimeProfile( profile.name );
-        profile.timeSets.forEach( function( ts ){
-            _profile.addTimeSet(
-                ts.tag,
-                ts.time,
-                ts.red,
-                ts.green,
-                ts.blue,
-                ts.gray,
-                ts.sfx );
-        } );
-        KUN.DayTime.addProfile( _profile );
-    });
-
-    KunDayTime.SetupCommands();
-    KunDayTime.SetupEscapeChars();
-    KunDayTime.SetupSceneMap();
-    
+(function () {
+    KunDayTime.Initialize();
+    KunDayTime_SetupCommands();
+    KunDayTime_SetupEscapeChars();
+    KunDayTime_SetupSceneMap();
 })();
 
 

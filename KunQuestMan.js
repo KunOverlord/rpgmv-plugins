@@ -4,54 +4,100 @@
 /*:
  * @plugindesc Kun's Quest Manager
  * @filename KunQuestMan.js
- * @version 1.7
+ * @version 1.96
  * @author KUN
  * 
  * @help
  * 
- * Quest State Checks (to use with Conditional Branches):
+ * Create a full quest log, with different types of quest behaviors and customizable display!
  * 
- *      quest_status( questID Or questID.stageID )
- *          - Returns Quest Status
- *      quest_active( quest , stage )
+ * You may categorize your quests and navigate through them all in the QuestLog menu option. Use the DebugMode ON to track and list all the hidden quests and stages to run.
+ * 
+ * Each quest can handle several stages, and each stage can handle a counter to provide an accurate progress. Define a chained set of quests, by adding the Next Quest's name.
+ * 
+ * Quest Type/Behaviors:
+ * 
+ *   Create Default quests, to track and control the progress of all stages. On after finishing all stages, the quest will be marked as completed automatically.
+ *   Example: An assestment list.
+ * 
+ *   Create Linear quests to display only the active stages and focus on the current task. Upon you clear all the stages, the quest will be marked as completed.
+ *   Example: A main quest, you can only watch your progress as you complete the required tasks.
+ * 
+ *   Create Optional quests to provide full control on the in-game plugin commands and script functions. You need to complete the quest manually, even if all the stages are clear.
+ *   Example: A sidequest task master who requires to evaluate which stages have you completed and which ones can be omitted.
+ * 
+ * Display the questLog in a command menu, define a range of sounds and icons to display on each quest update, integrate the notification messages with the KunNotifier Plugin
+ * 
+ * Quest State Conditions (to use with Conditional Branches):
+ * 
+ *      quest_status( quest , [ stage ] )
+ *          - Returns Quest or the QuestStage Status
+ *      quest_active( quest , [ stage ] )
  *          - Returns boolean if quest or quest stage is running
- *      quest_completed( questID Or questID.stageID )
+ *      quest_completed( quest , [ stage ] )
  *          - Returns boolean if quest or quest stage is completed
- *      quest_ready( questID Or questID.stageID )
+ *      quest_ready( quest )
  *          - Returns true if quest is ready to start (hidden)
- *      quest_failed( questID Or questID.stageID )
+ *      quest_failed( quest )
  *          - Returns true if quest has been cancelled or failed
+ *      quest_stage( quest , stage )
+ *          - Returns the current value of this quest stage
+ *      quest_check( quest | quest.stage , status )
+ *          - Returns true or false if the quest or quest stage meets the defined conditions in the status tag
+ *          - Check status: hidden|ready, active|running,completed,failed|cancelled
  * 
  *      Remember to use the quotes for all the non-numeric parameters ("myQuestId")
  * 
  * Quest State Functions:
  * 
- *      quest_start( myQuestID )
+ *      quest_start( quest )
  *          - Starts a new quest
- *      quest_update( myQuestID Or myQuestID.myStageID )
+ *      quest_update( quest , [stage|false] , [ progress ] )
  *          - Update and progress the quest or quest stage
- *      quest_complete( myQuestID Or myQuestID.myStageID )
+ *      quest_remaining( quest )
+ *          - Counts the amount of stages left to complete
+ *      quest_complete( quest , [stage] )
  *          - Completes a quest or quest stage
- *      quest_cancel( myQuestID )
+ *      quest_complete_all( quest )
+ *          - Totally completes a quest and all its stages
+ *      quest_cancel( qust )
  *          - Cancels a quest
- *      quest_reset( myQuestID )
+ *      quest_reset( quest )
  *          - Set a quest to it's original state and ready to get started (nice for random radiant quests)
  * 
  *      Remember to use the quotes for all the non-numeric parameters ("myQuestId")
  * 
  * Commands:
  * 
- *      KunQuestMan start myQuestID
- *      KunQuestMan update myQuestID OR myQuestID.myStageID
- *      KunQuestMan complete myQuestID OR myQuestID.myStageID
- *      KunQuestMan cancel myQuestID
- *      KunQuestMan reset myQuestID
+ *      KunQuestMan start quest [restart]
+ *          - Start quest
+ *          - Restart this quest if required (will reset this quest)
+ *      KunQuestMan restart quest
+ *          - Restarts a quest  (backwards compatibility)
+ *      KunQuestMan update quest [ stage ] [ amount ( default is 1 )]
+ *          - Updates a quest or a quest stage
+ *          - Define the update amount if required to fill the stage objectives
+ *      KunQuestMan complete quest [stage]
+ *          - Complete a quest and/ or quest stage
+ *      KunQuestMan completeAll quest
+ *          - Totally completes a quest and all its stages
+ *      KunQuestMan cancel quest
+ *          - Cancels a running quest
+ *      KunQuestMan fail quest
+ *          - Cancels a running quest (backwards compatibility)
+ *      KunQuestMan reset quest
+ *          - Resets a quest as ready to be started again (random cycling quests)
+ *      KunQuestMan remaining quest gameVar
+ *          - Exports a selected quest's remaining stages to complete into a gameVar variable
+ *      KunQuestMan check [quest|quest.stage] [status] [switchId]
+ *          - Export to switchId if the required status is met with the quest or quest stage
+ *          - Type status as: ready|hidden, active|running, completed, failed|cancelled
  *      KunQuestMan menu [enabled|disabled|hiden]
  *          - How to display in Player Menu
  *      KunQuestMan display|show
  *          - Open the QuestLog window
- *      KunQuestMan migrate quest_id|quest_stage_id new_id
- *          - Override and migrate quest and stage ids to new game updates when required.
+ *      KunQuestMan MigrateQuestData
+ *          - Migrate all quests to the new format
  *      KunQuestMan muted
  *          - Mute any quest update
  *      KunQuestMan notify
@@ -135,12 +181,19 @@
  * @parent QuestLog
  * @text Reward Text
  * @desc Append this text to the reward messsage in the quest window
- * @type Text
+ * @type text
+ * 
+ * @param detailChars
+ * @parent QuestLog
+ * @text Detail's length
+ * @desc Define the line length of the quest and stage details.
+ * @type number
+ * @default 50
  * 
  * @param CommandText
  * @text Command Menu Text
  * @desc Show this text in menu to topen the Quest Log
- * @type Text
+ * @type text
  * @default Quests
  * 
  * @param CommandMenu
@@ -185,6 +238,13 @@
  * @on Enable
  * @off Disable
  * @default false
+ * 
+ * @param compatibility
+ * @text Backwards Compatibility
+ * @desc Enables former commands used in Amirian Curse
+ * @type Boolean
+ * @default false
+ * 
  */
 /*~struct~Quest:
  * @param Key
@@ -198,11 +258,12 @@
  * 
  * @param Details
  * @text Details
- * @type text
+ * @desc Add here the quest description
+ * @type note
  *
  * @param Category
  * @desc Show this quest in different tabs
- * @type Text
+ * @type text
  * @default Main
  * 
  * @param Behavior
@@ -221,16 +282,14 @@
  * 
  * @param Next
  * @text Next Quest Id
- * @type Text
+ * @type text
  *
  * @param Icon
  * @type number
  * @default 0
  *
  * @param Stages
- * @text Stages
  * @type struct<Stage>[]
- * @desc Define here the list of stages for your quest
  */
 
 /*~struct~Stage:
@@ -244,7 +303,7 @@
  * @default new stage
  *
  * @param Details
- * @type text
+ * @type note
  * @desc Type in quest progress details here
  *
  * @param Objective
@@ -253,11 +312,38 @@
  * @min 1
  * @max 999
  * @default 1
+ * 
+ * @param varId
+ * @text Variable Id
+ * @type variable
+ * @desc Update this Game Variable when this stage is completed
+ * @default 0
+ * 
+ * @param varValue
+ * @parent varId
+ * @text Update Value
+ * @type number
+ * @min 1
+ * @desc Define an amount to update this game variable
+ * @default 1
+ * 
+ * @param varMethod
+ * @parent varId
+ * @text Update Method
+ * @desc Define the update behaviour for this game variable
+ * @type select
+ * @option Set value
+ * @value set
+ * @option Add value
+ * @value add
+ * @option Substract value
+ * @value sub
+ * @default set
  */
 /*~struct~Category:
  * @param category
  * @text Category
- * @type Text
+ * @type text
  * @default Main
  *
  * @param color
@@ -289,12 +375,24 @@ function QuestMan() { throw new Error('This is a static class'); };
 /**
  * Initialize all quest stuff
  * hooked in the game initializer
- * @param {Boolean} init
+ * @return QuestMan
  */
-QuestMan.setup = function (init) {
-
-    return typeof init === 'boolean' && init ? this.initMembers().initQuestData() : this.initMembers();
-
+QuestMan.setup = function () { return this.initMembers().createPartyQuestData(); };
+/**
+ * @returns QuestMan
+ */
+QuestMan.createPartyQuestData = function(){
+    $gameParty.createQuestData();
+    return this;
+};
+/**
+ * Translation interface
+ * @param {String} text_id 
+ * @param {String} content 
+ * @returns String
+ */
+QuestMan.Translate = function (text_id, content) {
+    return typeof KunQuestLocale === 'function' ? KunQuestLocale.Translate(text_id, content) : content;
 };
 /**
  * @returns QuestMan
@@ -311,7 +409,10 @@ QuestMan.initMembers = function () {
     this._questItemEventId = parseInt(parameters.onGetQuestItemEvent);
     this._questItemVarId = parseInt(parameters.itemVarId);
     this._questItemAmountId = parseInt(parameters.amountVarId);
+    this._detailsLength = parseInt(parameters.detailChars || 50);
     this._debug = parameters.debug === 'true';
+    this._compatibility = parameters.compatibility === 'true';
+    this._menuStatus = parameters.CommandMenu || QuestMan.MenuStatus.Enabled;
     this._muted = false;
     this._layoutSize = 4;
     this._icons = {
@@ -341,6 +442,18 @@ QuestMan.initMembers = function () {
     return this;
 };
 /**
+ * @returns Number
+ */
+QuestMan.detailsLength = function () {
+    return this._detailsLength;
+};
+/**
+ * @returns String
+ */
+QuestMan.defaultMenuStatus = function(){
+    return this._menuStatus;
+};
+/**
  * @param Boolean reset
  * @returns Object
  */
@@ -363,6 +476,16 @@ QuestMan.selectQuest = function (name) {
  * @returns Boolean
  */
 QuestMan.debug = function () { return this._debug; };
+/**
+ * @returns Boolean
+ */
+QuestMan.compatibility = function () { return this._compatibility; };
+/**
+ * @returns Array
+ */
+QuestMan.commands = function () {
+    return this.compatibility() ? ['KunQuestMan', 'QuestLog'] : ['KunQuestMan'];
+};
 /**
  * @returns Number
  */
@@ -448,16 +571,26 @@ QuestMan.addCategory = function (category, icon, color) {
  */
 QuestMan.importCategories = function (input) {
     (Array.isArray(input) ? input : []).filter(c => c.length > 0).map(c => JSON.parse(c)).forEach(function (c) {
-        QuestMan.addCategory(c.category, parseInt(c.icon), parseInt(c.color));
+        QuestMan.addCategory(
+            QuestMan.Translate('category', c.category),
+            parseInt(c.icon),
+            parseInt(c.color));
     });
     return this;
 };
 /**
  * @param {String} category 
- * @returns Object
+ * @returns Number
  */
-QuestMan.getCategoryFormat = function (category) {
-    return this._categories.hasOwnProperty(category) ? this._categories[category] : { 'icon': 0, 'color': 0 };
+QuestMan.getCategoryIcon = function (category) {
+    return this._categories.hasOwnProperty(category) ? this._categories[category].icon : this.icon('default');
+};
+/**
+ * @param {String} category 
+ * @returns Number
+ */
+QuestMan.getCategoryColor = function (category) {
+    return this._categories.hasOwnProperty(category) ? this._categories[category].color : 0;
 };
 /**
  * @param {Object} input 
@@ -466,42 +599,48 @@ QuestMan.getCategoryFormat = function (category) {
 QuestMan.importQuests = function (input) {
 
     (Array.isArray(input) ? input : []).filter(q => q.length > 0).map(q => JSON.parse(q)).forEach(function (q) {
-
-        var stages = (q.hasOwnProperty('Stages') && q.Stages.length > 0 ? JSON.parse(q.Stages) : []).filter(s => s.length > 0).map(s => JSON.parse(s));
         var quest = new Quest(
             q.Key,
             q.Title,
             q.Category,
-            q.Details,
+            (q.Details || '').replace(/\\n/g, " ").replace(/\"/g, ""),
             parseInt(q.Icon),
             q.Behavior,
-            q.Reward
+            q.Next || '',
+            q.Reward.length > 0 ? QuestMan.Translate(q.Key + '.reward', q.Reward) : ''
         );
-        quest.setNextQuest(q.Next);
+        var stages = (q.hasOwnProperty('Stages') && q.Stages.length > 0 ? JSON.parse(q.Stages) : []).filter(s => s.length > 0).map(s => JSON.parse(s));
         //var stages = quest.hasOwnProperty('Stages') && quest.Stages.length > 0 ? JSON.parse( quest.Stages ) : [];
-        stages.forEach(function (s) {
-            quest.add(s.Key, s.Title, s.Details, parseInt(s.Objective));
+        stages.forEach(function (stage) {
+            quest.addStage(
+                stage.Key,
+                stage.Title || stage.Key,
+                (stage.Details || '').replace(/\\n/g, " ").replace(/\"/g, ""),
+                parseInt(stage.Objective),
+                parseInt(stage.varId || 0),
+                parseInt(stage.varValue || 1),
+                stage.varMethod || QuestStage.VariableMethod.Add);
         });
-        QuestMan.addQuest(quest).addCategory(q.Category);
+        QuestMan.addQuest(quest).addCategory(quest.category());
     });
     return this;
 };
 /**
  * @returns Game_Party.QuestData
  */
-QuestMan.db = function () { return $gameParty.QuestData() };
+QuestMan.data = function () { return $gameParty.QuestData() };
+/**
+ * @returns Boolean
+ */
+QuestMan.hasData = function(){
+    return $gameParty.QuestData() instanceof Game_QuestData;
+};
 /**
  * @returns QuestMan
  */
 QuestMan.initQuestData = function () {
-    var db = this.db();
-    this.quests(true).forEach(function (quest) {
-        db.reset(quest.name(), quest.list());
-        //quest.stages(true).forEach(function (stage) {
-        //    db.reset(quest.name(), stage.name());
-        //});
-    });
 
+    return this;
     var params = this.importParameters();
     this.setMenuStatus(params.CommandMenu);
 
@@ -512,27 +651,25 @@ QuestMan.initQuestData = function () {
  * @return {QuestMan}
  */
 QuestMan.setMenuStatus = function (status) {
-    this.db().setParam('menu_status', status || QuestMan.MenuStatus.Enabled);
+    if( this.hasData() ){
+        this.data().setMenuStatus(status);
+    }
     return this;
 };
 /**
  * @returns {Boolean}
  */
 /*QuestMan.menuStatus = function () {
-    return this.db().param('menu_status', QuestMan.MenuStatus.Enabled);
+    return this.data().menuStatus();
 }*/
 /**
  * @returns {Boolean}
  */
-QuestMan.isMenuEnabled = function () {
-    return this.db().param('menu_status', '') === QuestMan.MenuStatus.Enabled;
-}
+QuestMan.isMenuEnabled = function () { return this.data().isMenuEnabled(); }
 /**
  * @returns {Boolean}
  */
-QuestMan.isMenuVisible = function () {
-    return this.db().param('menu_status', '') !== QuestMan.MenuStatus.Hidden;
-}
+QuestMan.isMenuVisible = function () { return this.data().isMenuVisible(); }
 /**
  * @returns Boolean
  */
@@ -556,12 +693,12 @@ QuestMan.icon = function (icon) {
  * @returns String
  */
 QuestMan.string = function (string) {
-    return this._strings.hasOwnProperty(string) ? this._strings[string] : string;
+    return this._strings && this._strings.hasOwnProperty(string) ? this._strings[string] : string;
 };
 /**
  * @returns Object
  */
-QuestMan.data = function () {
+QuestMan.dump = function () {
     var output = {};
     Object.keys(this).filter(key => key.match(/^[\_]+/)).forEach(function (key) {
         output[key] = this[key];
@@ -663,18 +800,14 @@ QuestMan.Close = function () {
     }
     return this;
 };
-
 /**
  * @param {name} id 
  * @param {Boolean} override 
  * 
  * @returns QuestMan
  */
-QuestMan.Migrate = function (name, override) {
-    //var db = new Quest.Data();
-    //db.migrate( id , override );
-    $gameParty.QuestManager().migrate(name, override);
-
+QuestMan.Migrate = function () {
+    $gameParty.migrateQuestData();
     return this;
 };
 
@@ -704,194 +837,266 @@ QuestMan.MenuStatus = {
     'Disabled': 'disabled',
     'Hidden': 'hidden',
 };
+/**
+ * @param {String} name 
+ * @returns String
+ */
+QuestMan.ParseName = function( name ){
+    //return typeof name === 'string' && name.length ? name.toUpperCase() : '';
+    return typeof name === 'string' && name.length ? name.toLowerCase() : '';
+    //return typeof name === 'string' && name.length ? name : '';
+};
+/**
+ * 
+ */
+function Game_QuestData() {
+    this.initialize.apply(this, arguments);
+}
+/**
+ * 
+ */
+Game_QuestData.prototype.initialize = function () {
+
+    this._data = {};
+    this._menu = QuestMan.defaultMenuStatus();
+};
+/**
+ * Game Quest Data (saveable)
+ * @returns Object
+ */
+Game_QuestData.prototype.data = function () {
+    return this._data;
+};
+/**
+ * @param {String} quest_id 
+ * @param {String} stage_id 
+ * @returns Boolean
+ */
+Game_QuestData.prototype.has = function (quest_id, stage_id) {
+    if (typeof quest_id === 'string' && quest_id.length && this.data().hasOwnProperty(quest_id)) {
+        if (typeof stage_id === 'string') {
+            return stage_id.length && stage_id !== 'STATUS' ? this.data()[quest_id].hasOwnProperty(stage_id) : false;
+        }
+        return true;
+    }
+    return false;
+};
+/**
+ * @param {String} quest_id 
+ * @param {String} stage_id 
+ * @param {Number} amount 
+ * @returns Game_Party.QuestData
+ */
+Game_QuestData.prototype.set = function (quest_id, stage_id, amount) {
+    if (typeof amount !== 'number' || amount < 1) {
+        amount = 0;
+    }
+    if (this.has(quest_id)) {
+        this.data()[quest_id][stage_id] = amount;
+    }
+    return this;
+};
+/**
+ * @param {String} quest_id 
+ * @param {String} stage_id 
+ * @returns 
+ */
+Game_QuestData.prototype.get = function (quest_id, stage_id) {
+    if (typeof quest_id === 'string') {
+
+        if (typeof stage_id === 'string') {
+            return this.has(quest_id, stage_id) ? this.data()[quest_id][stage_id] : 0;
+        }
+        else {
+            return this.has(quest_id) ? this.data()[quest_id].STATUS : Quest.Status.Hidden;
+        }
+    }
+    return Quest.Status.Hidden;
+};
+/**
+ * Update quest and stage data
+ * @param {String} quest_id 
+ * @param {String} stage_id 
+ * @param {Number} amount 
+ * @returns Number
+ */
+Game_QuestData.prototype.update = function (quest_id, stage_id, amount) {
+    if (this.has(quest_id, stage_id)) {
+        var value = this.get(quest_id, stage_id) + (typeof amount === 'number' && amount > 1 ? amount : 1);
+        //QuestMan.DebugLog( value );
+        this.set(quest_id, stage_id, value);
+        return value;
+    }
+    return 0;
+};
+/**
+ * @param {String} quest_id 
+ * @returns Number
+ */
+Game_QuestData.prototype.status = function (quest_id) {
+    return this.has(quest_id) ? this.data()[quest_id].STATUS : Quest.Status.Hidden;
+};
+/**
+ * @param {String} quest_id 
+ * @param {Number} status 
+ * @returns Number
+ */
+Game_QuestData.prototype.setStatus = function (quest_id, status) {
+    if (this.has(quest_id)) {
+        this.data()[quest_id].STATUS = status;
+    }
+    else {
+        //Allow setup on the fly
+        this.data()[quest_id] = { 'STATUS': status };
+    }
+    return this.data()[quest_id].STATUS;
+};
+/**
+ * @param {String} quest_id 
+ * @returns GameParty.QuestData
+ */
+Game_QuestData.prototype.reset = function (quest_id, stages) {
+    this.data()[quest_id] = { 'STATUS': Quest.Status.Hidden };
+    if (Array.isArray(stages)) {
+        for (var s in stages) {
+            this.set(quest_id, stages[s]);
+            QuestMan.DebugLog(`Reset ${quest_id}.${stages[s]}...`);
+        }
+    }
+    return this;
+};
+/**
+ * Compatibility
+ * @param {String} quest_id
+ * @returns GameParty.QuestData
+ */
+Game_QuestData.prototype.register = function (quest_id) {
+    return this.reset(quest_id);
+};
+/**
+ * @param {String} name 
+ * @returns Array
+ */
+Game_QuestData.prototype.list = function (name) {
+    return typeof name === 'string' && this.has(name) ?
+        Object.keys(this.data()[name]).filter(id => id !== 'STATUS') :
+        Object.keys(this.data());
+};
+/**
+ * @param {String} param 
+ * @param {Boolean} value 
+ * @returns GameParty.QuestData
+ */
+Game_QuestData.prototype.setMenuStatus = function (status) {
+    this._menu = status || QuestMan.MenuStatus.Enabled;
+};
+/**
+ * @param {String} param 
+ * @param {Boolean} value 
+ * @returns GameParty.QuestData
+ */
+Game_QuestData.prototype.menuStatus = function () {
+    return this._menu;
+};
+/**
+ * @returns Boolean
+ */
+Game_QuestData.prototype.isMenuEnabled = function () {
+    return this._menu === QuestMan.MenuStatus.Enabled
+    ;
+};
+/**
+ * @returns Boolean
+ */
+Game_QuestData.prototype.isMenuVisible = function () {
+    return this._menu !== QuestMan.MenuStatus.Hidden;
+};
+/**
+ * @returns Game_QuestData
+ */
+Game_QuestData.prototype.migrate = function(){
+    //console.log( this._data);
+    this._data = Game_QuestData.ParseQuestData( this._data );
+    //console.log( this._data);
+    return this;
+};
+/**
+ * Migrates all saved quest data to a new format
+ * @param {Object} input 
+ * @returns Object
+ */
+Game_QuestData.ParseQuestData = function( input ){
+    var output = {};
+    if( typeof input === 'object' ){
+        Object.keys( input ).forEach( function( quest ){
+            var quest_id = QuestMan.ParseName(quest);
+            output[quest_id] = {};
+            Object.keys( input[ quest ] ).forEach( function( stage ){
+                output[quest_id][stage === 'STATUS' ? stage : QuestMan.ParseName(stage)] = input[ quest ][ stage ];
+            });
+        });
+    }
+    return output;
+};
 
 /**
  * Register the quest data manager
  */
 function QuestManager_RegisterQuestData() {
+    //var _QuestManager_PartyInit = Game_Party.prototype.initialize;
+    /*Game_Party.prototype.initialize = function () {
+
+        _QuestManager_PartyInit.call(this);
+
+        if( this.canCreateQuestData() ){
+            this.createQuestData();
+        }
+    };*/
+    /**
+     * Initialize the quest data container
+     */
+    Game_Party.prototype.createQuestData = function () {
+        if( this.canCreateQuestData() ){
+            //backwards compatibility / quick import - Check if the previous release had _questData object definition and parse it to the new format
+            var data = Game_QuestData.ParseQuestData( typeof this._questData === 'object' ? this._questData : { } );
+            //capture the menu status from previous data format or set it as default
+            var status = typeof this._questParams === 'object' && this._questParams.hasOwnProperty('menu_status') ?
+                this._questParams['menu_status'] :
+                QuestMan.defaultMenuStatus();
+            //setup the new quest data engine
+            this._questData = new Game_QuestData();
+            this._questData._data = data;
+            this._questData._menu = status;
+            //remove older data
+            if( typeof this._questParams === 'object'){
+                delete this._questParams;
+            }
+        }
+    };
+    /**
+     * @returns Boolean
+     */
+    Game_Party.prototype.migrateQuestData = function(){
+        if( this._questData instanceof Game_QuestData ){
+            this._questData.migrate();
+            return true;
+        }
+        return false;
+    };
+    /**
+     * @returns Boolean
+     */
+    Game_Party.prototype.canCreateQuestData = function(){
+        return !(this._questData instanceof Game_QuestData);
+        return typeof this._questData !== 'object' || !(this._questData instanceof Game_QuestData);
+    };
     /**
      * Quest Data Manager (update, save, load)
      * @returns Game_Party.QuestData
      */
     Game_Party.prototype.QuestData = function () {
-        /**
-         * @param {String} quest_id 
-         * @param {String} stage_id 
-         * @returns Boolean
-         */
-        this.has = function (quest_id, stage_id) {
-            if (typeof quest_id === 'string' && quest_id.length && this.data().hasOwnProperty(quest_id)) {
-                if (typeof stage_id === 'string') {
-                    return stage_id.length && stage_id !== 'STATUS' ? this.data()[quest_id].hasOwnProperty(stage_id) : false;
-                }
-                return true;
-            }
-            return false;
-        };
-        /**
-         * Update quest and stage data
-         * @param {String} quest_id 
-         * @param {String} stage_id 
-         * @param {Number} amount 
-         * @returns Number
-         */
-        this.update = function (quest_id, stage_id, amount) {
-            amount = typeof amount === 'number' && amount > 1 ? amount : 1;
-            if (this.has(quest_id, stage_id)) {
-                var value = this.get(quest_id, stage_id) + amount;
-                this.set(quest_id, stage_id, value);
-                return value;
-            }
-            return 0;
-        };
-        /**
-         * @param {String} quest_id 
-         * @param {String} stage_id 
-         * @returns 
-         */
-        this.get = function (quest_id, stage_id) {
-            if (typeof quest_id === 'string') {
 
-                if (typeof stage_id === 'string') {
-                    return this.has(quest_id, stage_id) ? this.data()[quest_id][stage_id] : 0;
-                }
-                else {
-                    return this.has(quest_id) ? this.data()[quest_id].STATUS : Quest.Status.Hidden;
-                }
-            }
-            return Quest.Status.Hidden;
-        };
-        /**
-         * @param {String} quest_id 
-         * @param {String} stage_id 
-         * @param {Number} amount 
-         * @returns Game_Party.QuestData
-         */
-        this.set = function (quest_id, stage_id, amount) {
-            if (typeof amount !== 'number' || amount < 1) {
-                amount = 0;
-            }
-            if (this.has(quest_id)) {
-                this.data()[quest_id][stage_id] = amount;
-            }
-            return this;
-        };
-        /**
-         * @param {String} quest_id 
-         * @returns Number
-         */
-        this.status = function (quest_id) {
-            return this.has(quest_id) ? this.data()[quest_id].STATUS : Quest.Status.Hidden;
-        };
-        /**
-         * @param {String} quest_id 
-         * @param {Number} status 
-         * @returns Number
-         */
-        this.setStatus = function (quest_id, status) {
-            if (this.has(quest_id)) {
-                this.data()[quest_id].STATUS = status;
-            }
-            else {
-                //Allow setup on the fly
-                this.data()[quest_id] = { 'STATUS': status };
-            }
-            return this.data()[quest_id].STATUS;
-        };
-        /**
-         * @param {String} quest_id 
-         * @returns GameParty.QuestData
-         */
-        this.reset = function (quest_id, stages) {
-            this.data()[quest_id] = { 'STATUS': Quest.Status.Hidden };
-            if (Array.isArray(stages)) {
-                for (var s in stages) {
-                    this.set(quest_id, stages[s]);
-                    console.log(`Reset ${quest_id}.${stages[s]}...`);
-                }
-            }
-            return this;
-        };
-        /**
-         * Compatibility
-         * @param {String} quest_id
-         * @returns GameParty.QuestData
-         */
-        this.register = function (quest_id) {
-            return this.reset(quest_id);
-        };
-        /**
-         * @param {String} name 
-         * @returns Array
-         */
-        this.list = function (name) {
-            return typeof name === 'string' && this.has(name) ?
-                Object.keys(this.data()[name]).filter(id => id !== 'STATUS') :
-                Object.keys(this.data());
-        };
-        /**
-         * @returns Object
-         */
-        this.data = function () {
-            if (!this.hasOwnProperty('_questData')) { this._questData = {}; }
-            return this._questData;
-        };
-        /**
-         * @returns Object
-         */
-        this.parameters = function () {
-            if (!$gameParty.hasOwnProperty('_questParams')) $gameParty._questParams = {};
-            return $gameParty._questParams;
-        };
-
-        /**
-         * @param {String} param 
-         * @param {Number|String|Boolean} value default
-         * @returns 
-         */
-        this.param = function (param, value) {
-
-            return this.parameters().hasOwnProperty(param) ?
-                this.parameters()[param] :
-                value;
-        };
-        /**
-         * @param {String} param 
-         * @param {Boolean} value 
-         * @returns GameParty.QuestData
-         */
-        this.setParam = function (param, value) {
-            this.parameters()[param] = value;
-            return this;
-        };
-        /**
-         * Change the quest identifiers wuen required by a game update or migration
-         * @param {String} id 
-         * @param {String} override 
-         * @returns GameParty.QuestData
-         */
-        this.migrate = function (id, override) {
-            if (typeof id !== 'string' || typeof override !== 'string') {
-                return this;
-            }
-            var name = id.split('.');
-            if (this.has(id) && override.length && !this.has(`${name[0]}.${override}`)) {
-                if (name.length > 1) {
-                    var data = this.data()[name[0]][name[1]];
-                    this.data()[name[0]][override] = data;
-                    delete this.data()[name[0]][name[1]];
-                }
-                else {
-                    //quest override
-                    var data = this.data()[name[0]];
-                    this.data()[override] = data;
-                    delete this.data()[name[0]];
-                }
-            }
-            return this;
-        };
-
-        return this;
+        return this._questData || {};
     };
 };
 /**
@@ -914,12 +1119,11 @@ function QuestManager_registerQuestItemEvent() {
  */
 function QuestManager_registerMenu() {
 
-    //var _self = this;
     var _kunQuestMan_OriginalMenuCommands = Window_MenuCommand.prototype.addOriginalCommands;
     Window_MenuCommand.prototype.addOriginalCommands = function () {
         _kunQuestMan_OriginalMenuCommands.call(this);
         if (QuestMan.isMenuVisible()) {
-            this.addCommand(QuestMan.string('command', 'Journal'), 'quest', QuestMan.isMenuEnabled());
+            this.addCommand(QuestMan.string('command', 'Quests'), 'quest', QuestMan.isMenuEnabled());
         }
     };
     var _kunQuestMan_CreateCommands = Scene_Menu.prototype.createCommandWindow;
@@ -940,7 +1144,7 @@ function QuestManager_registerNewGame() {
     var _kunQuestMan_NewGame = Scene_Title.prototype.commandNewGame;
     Scene_Title.prototype.commandNewGame = function () {
         _kunQuestMan_NewGame.call(this);
-        QuestMan.setup(true);
+        QuestMan.setup();
     };
     var _kunQuestMan_GameLoad = Game_System.prototype.onAfterLoad;
     Game_System.prototype.onAfterLoad = function () {
@@ -949,6 +1153,35 @@ function QuestManager_registerNewGame() {
     }
 }
 /**
+ * Setup text dialogs
+ */
+function QuestManager_registerEscapeCharacters() {
+    //Window_Base.prototype.JayaKSetup_escapeCharacters = Window_Base.prototype.convertEscapeCharacters;
+    var _KunQuestMan_EscapeCharacters = Window_Base.prototype.convertEscapeCharacters;
+    Window_Base.prototype.convertEscapeCharacters = function (text) {
+        var parsed = _KunQuestMan_EscapeCharacters.call(this, text);
+
+        //include the quest names and stages here
+        return parsed.replace(/\x1bQUEST\[(\s+)\]/gi, function () {
+            //get quest Id
+            return this.displayQuestData(parseInt(arguments[1]));
+        }.bind(this));
+    };
+
+    Window_Base.prototype.displayQuestData = function (name) {
+        var path = name.split('.');
+        var quest = QuestMan.quest(path[0]);
+        if (quest !== null) {
+            if (path.length > 1) {
+                var stage = quest.stage(path[1]);
+                return stage !== null ? stage.title() : '<INVALID STAGE>';
+            }
+            return quest.title(true);
+        }
+        return '<INVALID QUEST>';
+    };
+};
+/**
  * Hook the commands
  */
 function QuestManager_registerCommands() {
@@ -956,38 +1189,58 @@ function QuestManager_registerCommands() {
     var _kunQuestMan_CommandInterpreter = Game_Interpreter.prototype.pluginCommand;
     Game_Interpreter.prototype.pluginCommand = function (command, args) {
         _kunQuestMan_CommandInterpreter.call(this, command, args);
-        if (command === 'KunQuestMan' || command === 'QuestLog') {
+        if (QuestMan.commands().includes(command)) {
+            //if (command === 'KunQuestMan' || command === 'QuestLog') {
             //override with plugin command manager
             switch (args[0]) {
                 case 'start':
-                    quest_start(args[1]);
-                    break;
-                case 'update':
-                    var amount = 0;
-                    var name = args[1].split('.');
-                    if (args.length > 2) {
-                        if (args.length > 3 && args[3] === 'import') {
-                            amount = $gameVariables.value(parseInt(args[2]));
-                        }
-                        else {
-                            amount = parseInt(args[2]);
-                        }
-                    }
-                    quest_update(name[0], name.length > 1 ? name[1] : false, amount);
-                    break;
-                case 'complete':
-                    var name = args[1].split('.');
-                    quest_complete(name[0], name.length > 1 ? name[1] : false);
-                    break;
-                case 'fail':
-                case 'cancel':
-                    quest_cancel(args[1]);
-                    break;
-                case 'reset':
-                    quest_reset(args[1]);
+                    var quests = args[1].split(':');
+                    var reset = args.length > 2 && args[2] === 'reset';
+                    quests.forEach(q => quest_start(q, reset));
                     break;
                 case 'restart':
-                    quest_restart(args[1]);
+                    var quests = args[1].split(':');
+                    quests.forEach(q => quest_restart(q));
+                    break;
+                case 'reset':
+                    var quests = args[1].split(':');
+                    quests.forEach(q => quest_reset(q));
+                    break;
+                case 'update':
+                    if (args.length > 1) {
+                        var amount = args.length > 3 ? parseInt(args[3]) : 1;
+                        if (args.length > 4 && args[4] === 'import') {
+                            amount = $gameVariables.value(amount);
+                        }
+                        quest_update(args[1], args.length > 2 ? args[2] : '', amount);
+                    }
+                    break;
+                case 'complete':
+                    if (args.length > 1) {
+                        quest_complete(args[1], args.length > 2 ? args[2] : '');
+                    }
+                    break;
+                case 'completeAll':
+                    if (args.length > 1) {
+                        quest_complete_all( args[1] );
+                    }
+                    break;
+                case 'fail': //backwards compatibility
+                case 'cancel':
+                    if (args.length > 1) {
+                        var quests = args[1].split(':');
+                        quests.forEach(q => quest_cancel(q));
+                    }
+                    break;
+                case 'check':
+                    if( args.length > 3 && !Number.isNaN(args[3])){
+                        $gameSwitches.setValue( parseInt(args[3]) , quest_check( args[1] , args[2] ) );
+                    }
+                    break;
+                case 'remaining':
+                    if( args.length > 2 && !Number.isNaN(args[2])){
+                        $gameVariables.setValue( parseInt(args[2]) , quest_remaining( args[1] ) );
+                    }
                     break;
                 case 'inventory':
                     if (args.length > 1) {
@@ -1002,15 +1255,15 @@ function QuestManager_registerCommands() {
                     QuestMan.Show();
                     break;
                 case 'muted':
+                case 'silent':
                     QuestMan.mute(true);
                     break;
                 case 'notify':
                     QuestMan.mute(false);
                     break;
-                case 'migrate':
-                    if (args.length > 2) {
-                        QuestMan.Migrate(args[1], args[2]);
-                    }
+                case 'MigrateQuestData':
+                    QuestMan.Migrate();
+                    break;
             }
         }
     };
@@ -1028,425 +1281,429 @@ function QuestManager_registerCommands() {
  * @param {String} category 
  * @param {String} details
  * @param {Number} icon 
- * @param {String} behavior 
+ * @param {String} behaviour 
+ * @param {String} next
  * @param {String} reward
  * @returns Quest
  */
-function Quest(name, title, category, details, icon, behavior, reward) {
+function Quest(name, title, category, details, icon, behaviour, next, reward) {
+    this._name = QuestMan.ParseName(name);
+    this._title = QuestMan.Translate(this._name + '.title', title);
+    this._details = QuestMan.Translate(this._name + '.details', details || '' );
+    this._category = QuestMan.Translate(this._name + '.category', category || 'main' );
+    this._icon = icon || 0;
+    this._behaviour = behaviour || Quest.Behaviour.Default;
+    this._reward = reward || '';
+    this._stages = {};
+    this._next = typeof next === 'string' && next.length ? QuestMan.ParseName(next) : '';
+};
 
-    var _Q = {
-        'name': name,
-        'title': title,
-        'details': details || '',
-        'category': category,
-        'icon': icon || 0,
-        'behavior': behavior || Quest.Behavior.Default,
-        'reward': reward || '',
-        'stages': {},
-        'next': '',
-        'self': this,
-    };
-    /**
-     * @returns Game_Party.QuestData
-     */
-    this.db = () => $gameParty.QuestData();
-    //this.db = () => new Quest.Data();
-    /**
-     * @param {String} quest_id 
-     * @returns Quest
-     */
-    this.setNextQuest = function (quest_id) {
-        _Q.next = quest_id || '';
-        return this;
-    };
-    /**
-     * @returns Quest|Boolean
-     */
-    this.next = function () {
-        return (_Q.next.length && this.db().has(_Q.next)) ?
-            QuestMan.quest(_Q.next) :
-            false;
-    };
-    /**
-     * @returns Quest
-     */
-    this.checkNext = function () {
-        var next = this.next();
-        //start new quest if required
-        if (next !== false) {
-            QuestMan.DebugLog('Starting Next Quest [' + _Q.next + ']');
-            next.start();
+//public getters
+/**
+ * @returns string
+ */
+Quest.prototype.name = function () { return this._name; };
+/**
+ * @param Boolean display Icon + Title
+ * @returns string
+ */
+Quest.prototype.title = function (display) {
+    return typeof display === 'boolean' && display ? `\\\I[${this.icon()}] ${this._title}` : this._title;
+};
+/**
+ * Backwards compatibility
+ * @returns String
+ */
+Quest.prototype.displayTitle = function () { return this.title(true); };
+/**
+ * @returns string
+ */
+Quest.prototype.category = function () { return this._category };
+/**
+ * @returns string
+ */
+Quest.prototype.reward = function () { return this._reward; };
+/**
+ * @returns Boolean
+ */
+Quest.prototype.hasReward = function () { return this._reward.length > 0; };
+/**
+ * @returns Quest
+ */
+Quest.prototype.next = function () { return this.hasNext() ? QuestMan.quest(this._next) : null; };
+/**
+ * @returns Boolean
+ */
+Quest.prototype.hasNext = function () { return this._next.length > 0; };
+/**
+ * @returns Quest
+ */
+Quest.prototype.checkNext = function () {
+    var next = this.next();
+    //start new quest if required
+    if (next !== null) {
+        next.start();
+    }
+    return this;
+}
+/**
+ * @returns string
+ */
+Quest.prototype.icon = function () {
+    return this.hasIcon() ? this._icon : QuestMan.getCategoryIcon(this.category());
+};
+/**
+ * @returns string
+ */
+Quest.prototype.hasIcon = function () { return this._icon > 0; };
+
+/**
+* @returns string
+*/
+Quest.prototype.details = function () {
+
+    var details = this._details.length > 0 ? this._details : '';
+
+    if (this.behaviour() === Quest.Behaviour.Linear) {
+        var stage = this.current();
+        if (stage !== false) {
+            details += stage.details();
         }
-        else {
-            QuestMan.DebugLog('Invalid Next Quest [' + _Q.next + ']');
-        }
-
-
-        return this;
     }
 
-    //public getters
-    /**
-     * @returns string
-     */
-    this.name = () => _Q.name;
-    /**
-     * Backwards compatibility
-     * @returns String
-     */
-    this.key = function () {
-        return this.name();
-    };
-    /**
-     * @param Boolean display Icon + Title
-     * @returns string
-     */
-    this.title = function (display) {
-        return typeof display === 'boolean' && display ?
-            '\\\I[' + this.icon() + '] ' + _Q.title :
-            _Q.title;
-    };
-    /**
-     * Backwards compatibility
-     * @returns String
-     */
-    this.displayTitle = function () {
-        return this.title(true);
-        return '\\\I[' + this.icon() + '] ' + this.title();
-    };
-    /**
-     * @returns string
-     */
-    this.category = () => _Q.category;
-    /**
-     * @returns string
-     */
-    this.reward = () => _Q.reward;
-    /**
-     * @returns number
-     */
-    this.status = function () {
-        return this.db().status(this.name());
-    };
-    /**
-     * @returns Number
-     */
-    this.completed = function () {
-        return this.status() === Quest.Status.Completed;
-    };
-    /**
-     * @returns Number
-     */
-    this.active = function () {
-        return this.status() === Quest.Status.Active;
-    };
-    /**
-     * @returns Number
-     */
-    this.failed = function () {
-        return this.status() === Quest.Status.Failed;
-    };
-    /**
-     * @returns Number
-     */
-    this.hidden = function () {
-        return this.status() === Quest.Status.Hidden;
-    };
-    /**
-     * @returns String
-     */
-    this.displayStatus = function () {
-        return Quest.Status.display(this.status());
-    };
-    /**
-     * @returns string
-     */
-    this.behavior = () => _Q.behavior;
-    /**
-     * @returns string
-     */
-    this.icon = () => _Q.icon ? _Q.icon : QuestMan.icon('default');
-    /**
-     * @returns string
-     */
-    this.details = function () {
+    return details;
+};
+/**
+ * @returns string
+ */
+Quest.prototype.details = function () {
 
-        var details = _Q.details.length > 0 ? _Q.details + "\n" : '';
+    var details = this._details.length > 0 ? this._details + "\n" : '';
 
-        if (this.behavior() === Quest.Behavior.Linear) {
-            var current = this.current();
-            if (current !== false) {
-                details += current.details();
-            }
+    if (this.behaviour() === Quest.Behaviour.Linear) {
+        var current = this.current();
+        if (current !== false) {
+            details += current.details();
         }
+    }
 
-        return details;
-    };
-    /**
-     * @param Number wordLimit Words per line, 50 by default
-     * @returns {Array}
-     */
-    this.displayDetail = function (wordLimit) {
-        var output = [];
-        this.details().split("\n").forEach(function (line) {
-            line.split(' ').forEach(function (word) {
-                if (output.length) {
-                    if (output[output.length - 1].length + word.length + 1 < (wordLimit || 50)) {
-                        //output[output.length - 1] += output[output.length - 1].length ? ' ' + word : word;
-                        output[output.length - 1] += ' ' + word;
-                    }
-                    else {
-                        output.push(word);
-                    }
+    return details;
+};
+/**
+ * @param Number wordLimit Words per line, 50 by default
+ * @returns {Array}
+ */
+Quest.prototype.displayDetail = function (wordLimit) {
+    var output = [];
+    wordLimit = wordLimit || 40;
+    this.details().split("\n").forEach(function (line) {
+        line.split(' ').forEach(function (word) {
+            if (output.length) {
+                if (output[output.length - 1].length + word.length + 1 < wordLimit) {
+                    output[output.length - 1] += ' ' + word;
                 }
                 else {
                     output.push(word);
                 }
-            });
-            //libe break
-            output.push('');
-        });
-
-        return output;
-    }
-    /**
-     * @param Boolean detailed
-     * @returns Number
-     */
-    this.progress = function (detailed) {
-        var objectives = 0
-        var completed = 0;
-        this.stages(true).forEach((stage) => {
-            objectives += stage.objective();
-            completed += stage.current();
-        });
-        return objectives > 0 ? completed / objectives : 0;
-    };
-    /**
-     * @returns Number
-     */
-    this.remaining = function () {
-        var _remaining = this.list().length - this.stages(true).filter(stage => stage.completed()).length;
-        return _remaining < 0 ? 0 : _remaining;
-    };
-    /**
-     * @param {Boolean} list 
-     * @returns Array | Object
-     */
-    this.stages = function (list) {
-        return list || false ? Object.values(_Q.stages) : _Q.stages;
-        //return list || false ? this.list().map((name) => _Q.stages[name]) : _Q.stages;
-    };
-    /**
-     * @returns Array
-     */
-    this.list = () => Object.keys(_Q.stages);
-    /**
-     * @returns Number
-     */
-    this.countStages = function () {
-        return this.list().length;
-    };
-    /**
-     * @returns Array
-     */
-    this.visibleStages = function () {
-        if (_Q.behavior === Quest.Behavior.Linear) {
-            var list = this.list();
-            var current = this.current();
-            var _quest = this;
-            if (current !== false && list.includes(current.name())) {
-                //console.log( 'current: ' + current.name());
-                //console.log(list);
-                var from = list.indexOf(current.name());
-                var output = list.slice(0, from < list.length ? from + 1 : from);
-                //console.log( output );
-                return output.map(stage_id => _quest.stage(stage_id));
-            }
-            return [];
-        }
-        return this.stages(true);
-    };
-    /**
-     * @param {String} stage_id 
-     * @returns QuestStage
-     */
-    this.stage = function (stage_id) {
-        return this.has(stage_id) ? _Q.stages[stage_id] : false;
-        return _Q.stages.hasOwnProperty(stage_id) ? _Q.stages[stage_id] : false;
-    };
-    /**
-     * @param {String} stage_id 
-     * @returns Boolean
-     */
-    this.has = function (stage_id) {
-        return typeof stage_id === 'string' && stage_id.length && _Q.stages.hasOwnProperty(stage_id);
-    };
-    /**
-     * Current quest stage if Linear behavior is enabled
-     * @returns QuestStage|Boolean
-     */
-    this.current = function () {
-        if (this.status() === Quest.Status.Active) {
-            //if( this.behavior() === Quest.Behavior.Linear || this.behavior() === Quest.Behavior.Default ){
-            var stages = this.stages(true).filter(s => s.status() < Quest.Status.Completed);
-            if (stages.length) {
-                return stages[0];
-            }
-        }
-        return false;
-    };
-    /**
-     * @param {String} name 
-     * @param {String} title 
-     * @param {String} details 
-     * @param {Number} objective 
-     * @returns Quest
-     */
-    this.add = function (name, title, details, objective) {
-
-        if (!_Q.stages.hasOwnProperty(name)) {
-            var S = new QuestStage(name, title, details || "", objective || 1);
-            var _self = this;
-            S.quest = function () { return _Q.name; } //attach the quest owner identifier
-            //S.check = function () { _self.check() }; //attach the quest status checker
-            _Q.stages[name] = S;
-        }
-
-        return this;
-    };
-    /**
-     * @param {Number} status 
-     * @returns Quest
-     */
-    this.set = function (status) {
-        this.db().setStatus(this.name(), status);
-        return this;
-    };
-    /**
-     * @param {String} id
-     * @returns Quest
-     */
-    this.reset = function () {
-        this.db().reset(this.name(), this.list());
-        return this;
-    };
-    /**
-     * @param {Number} status 
-     * @returns Boolean
-     */
-    this.start = function () {
-        if (this.status() < Quest.Status.Active) {
-            this.set(Quest.Status.Active).notify(this.displayTitle() + ' started.').playMedia('start');
-        }
-        return this.status() === Quest.Status.Active;
-    };
-    /**
-     * 
-     * @param {String} stage_id 
-     * @param {Number} amount
-     * @returns Number
-     */
-    this.update = function (stage_id, amount) {
-        if (this.status() < Quest.Status.Completed) {
-            if (this.status() < Quest.Status.Active) {
-                return this.set(Quest.Status.Active).notify(this.displayTitle() + ' started.').playMedia('start').status();
-            }
-            else{
-                var stage = this.behavior() === Quest.Behavior.Linear ? this.current() : this.stage(stage_id);
-                if( stage !== false && !stage.completed( ) ){
-                    if( this.behavior() === Quest.Behavior.Linear && typeof stage_id === 'string' && stage_id.length && stage_id !== stage.name() ){
-                        QuestMan.DebugLog(`Only current quest stage can be updated in Linear Quest ${this.name()}`);
-                        return this.status();
-                    }
-                    stage.update( amount || 1 );
-                    QuestMan.DebugLog(`${this.name()}.${ stage.name() } + ${amount || 1}`);
-                    if( this.behavior() !== Quest.Behavior.Optional ){
-                        if( this.remaining() > 0 ){
-                            this.notify(this.displayTitle() + ' updated.').playMedia('update');
-                        }
-                        else{
-                            this.set(Quest.Status.Completed).notify(this.displayTitle() + ' completed.').playMedia('complete').checkNext();
-                        }
-                    }
-                }
-            }
-        }
-        return this.status();
-    };
-    /**
-     * @param {String} stage_id (stage)
-     * @returns Quest
-     */
-    this.complete = function (stage_id) {
-        if (this.status() < Quest.Status.Completed) {
-            if (this.has(stage_id)) {
-                if (this.stage(stage_id).complete() === Quest.Status.Completed) {
-                    if (this.remaining() > 0) {
-                        this.notify(this.displayTitle() + ' updated.').playMedia('update');
-                    }
-                    else {
-                        this.notify(this.displayTitle() + ' completed.').playMedia('complete').checkNext();
-                    }
-                    return true;
-                }
             }
             else {
-                this.set(Quest.Status.Completed);
-                this.notify(this.displayTitle() + ' completed.').playMedia('complete').checkNext();
+                output.push(word);
             }
+        });
+        //libe break
+        output.push('');
+    });
+
+    return output;
+}
+
+/**
+ * @returns Game_Party.QuestData
+ */
+Quest.prototype.data = function () { return $gameParty.QuestData(); };
+/**
+ * @returns number
+ */
+Quest.prototype.status = function () { return this.data().status(this.name()); };
+/**
+ * @returns Number
+ */
+Quest.prototype.completed = function () { return this.status() === Quest.Status.Completed; };
+/**
+ * @returns Number
+ */
+Quest.prototype.active = function () { return this.status() === Quest.Status.Active; };
+/**
+ * @returns Number
+ */
+Quest.prototype.failed = function () { return this.status() === Quest.Status.Failed; };
+/**
+ * @returns Number
+ */
+Quest.prototype.hidden = function () { return this.status() === Quest.Status.Hidden; };
+/**
+ * @returns String
+ */
+Quest.prototype.displayStatus = function () { return Quest.Status.display(this.status()); };
+/**
+ * @returns string
+ */
+Quest.prototype.behaviour = function () { return this._behaviour; };
+/**
+ * @returns Boolean
+ */
+Quest.prototype.isLinear = function () { return this.behaviour() === Quest.Behaviour.Linear; };
+/**
+ * @returns Boolean
+ */
+Quest.prototype.isOptional = function () { return this.behaviour() === Quest.Behaviour.Optional; };
+/**
+ * @returns Number
+ */
+Quest.prototype.progress = function () {
+    var objectives = 0
+    var completed = 0;
+    this.stages(true).forEach((stage) => {
+        objectives += stage.objective();
+        completed += stage.current();
+    });
+    return objectives > 0 ? completed / objectives : 0;
+};
+/**
+ * @returns Number
+ */
+Quest.prototype.remaining = function () {
+    var stagesLeft = this.list().length - this.stages(true).filter(stage => stage.completed()).length;
+    return stagesLeft < 0 ? 0 : stagesLeft;
+};
+/**
+ * @param {Boolean} list 
+ * @returns Array | Object
+ */
+Quest.prototype.stages = function (list) {
+    return typeof list === 'boolean' && list ? Object.values(this._stages) : this._stages;
+};
+/**
+ * @returns Array
+ */
+Quest.prototype.list = function () { return Object.keys(this.stages()); };
+/**
+ * @returns Number
+ */
+Quest.prototype.countStages = function () { return this.stages().length; };
+/**
+ * @returns Array
+ */
+Quest.prototype.visibleStages = function () {
+    if ( this.isLinear( ) && this.status() < Quest.Status.Completed ) {
+        var list = this.list();
+        var current = this.current();
+        var _quest = this;
+        if (current !== false && list.includes(current.name())) {
+            var from = list.indexOf(current.name());
+            var visible = list.slice(0, from < list.length ? from + 1 : from );
+            //return output.map(stage_id => _quest.stage(stage_id));
+            return this.stages(true).filter( stage => visible.includes( stage.name( ) ) );
+            //this.stages(true).forEach()
+            //return output;
         }
-        return this.status() === Quest.Status.Completed;
-    };
-    /**
-     * @param {Number} status 
-     * @returns Quest
-     */
-    this.cancel = function () {
-        if (this.status() < Quest.Status.Completed) {
-            this.set(Quest.Status.Failed).notify(this.displayTitle() + ' failed.').playMedia('fail');
+        return [];
+    }
+    return this.stages(true);
+};
+/**
+ * @param {String} stage_id 
+ * @returns QuestStage
+ */
+Quest.prototype.stage = function (stage_id) { return this.has(stage_id) ? this.stages()[stage_id] : null; };
+/**
+ * @param {String} stage_id 
+ * @returns Boolean
+ */
+Quest.prototype.has = function (stage_id) {
+    return typeof stage_id === 'string' && stage_id.length && this._stages.hasOwnProperty(stage_id);
+};
+/**
+ * Current quest stage if Linear behavior is enabled
+ * @returns QuestStage|Boolean
+ */
+Quest.prototype.current = function () {
+    if (this.status() === Quest.Status.Active) {
+        //if( this.behaviour() === Quest.Behaviour.Linear || this.behaviour() === Quest.Behaviour.Default ){
+        var stages = this.stages(true).filter(s => s.status() < Quest.Status.Completed);
+        if (stages.length) {
+            return stages[0];
         }
-        return this.status() === Quest.Status.Failed;
-    };
+    }
+    return false;
+};
+/**
+ * @param {String} stage 
+ * @param {String} title 
+ * @param {String} details 
+ * @param {Number} objective 
+ * @param {Number} varId
+ * @param {Number} varAmount
+ * @param {String} varMethod
+ * @returns Quest
+ */
+Quest.prototype.addStage = function (stage, title, details, objective, varId, varAmount, varMethod) {
 
-    /**
-    * @returns Object
-    */
-    this.dump = function () {
+    stage = QuestMan.ParseName(stage);
 
-        var output = {
-            'name': _Q.name,
-            'title': _Q.title,
-            'category': _Q.category,
-            'icon': _Q.icon,
-            'behavior': _Q.behavior,
-            'status': this.status(),
-            'stages': []
-        };
-
-        this.stages(true).map((s) => output.stages.push(s.dump()));
-
-        return output;
-    };
-    /**
-     * @param {String} media 
-     * @returns Quest
-     */
-    this.playMedia = function (media) {
-        QuestMan.playMedia(media);
-        return this;
-    };
-    /**
-     * @param {String} message 
-     * @returns Quest
-     */
-    this.notify = function (message) {
-        QuestMan.notify(message);
-        return this;
-    };
+    if (!this.has(stage)) {
+        this._stages[stage] = new QuestStage(
+            this.name(),
+            stage,
+            title,
+            details || "",
+            objective || 1,
+            varId || 0,
+            varAmount || 1,
+            varMethod || QuestStage.VariableMethod.Add);
+    }
 
     return this;
-}
+};
+/**
+ * @param {Number} status 
+ * @returns Quest
+ */
+Quest.prototype.set = function (status) {
+    this.data().setStatus(this.name(), status);
+    return this;
+};
+/**
+ * @param {String} id
+ * @returns Quest
+ */
+Quest.prototype.reset = function () {
+    this.data().reset(this.name(), this.list());
+    return this;
+};
+/**
+ * @param {Number} status 
+ * @param {Boolean} mute
+ * @returns Boolean
+ */
+Quest.prototype.start = function ( mute ) {
+    if (this.status() < Quest.Status.Active) {
+        this.reset().set(Quest.Status.Active).notify(this.displayTitle() + ' started.');
+        if( !(typeof mute === 'boolean' && mute) ){
+            this.playMedia('start')
+        }
+    }
+    return this.active();
+};
+/**
+ * 
+ * @param {String} stage_id 
+ * @param {Number} amount
+ * @returns Number
+ */
+Quest.prototype.update = function (stage_id, amount) {
+    if (this.status() < Quest.Status.Completed) {
+        if (this.status() < Quest.Status.Active) {
+            //start quest
+            return this.start();
+        }
+        else {
+            //quest running, check update by behavior
+            var stage = this.isLinear() ? this.current() : this.stage(stage_id);
+            if (stage !== null && stage.active()) {
+                if (this.isLinear() && typeof stage_id === 'string' && stage_id.length && stage_id !== stage.name()) {
+                    //do nothing, linear quests can just be updated on their specific stage. Use current stage name or just questname to update it's curretn stage
+                    QuestMan.DebugLog(`Only current quest stage can be updated in Linear Quest ${this.name()}`);
+                    return this.status();
+                }
+                stage.update(amount || 1);
+                QuestMan.DebugLog(`${this.name()}.${stage.name()}  ${stage.value()} / ${stage.objective()}`);
+                if (this.remaining() > 0 || this.isOptional()) {
+                    this.notify(this.displayTitle() + ' updated.').playMedia('update');
+                }
+                else {
+                    this.set(Quest.Status.Completed).notify(this.displayTitle() + ' completed.').playMedia('complete').checkNext();
+                }
+            }
+        }
+    }
+    return this.status();
+};
+/**
+ * @param {String} stage_id (stage)
+ * @returns Quest
+ */
+Quest.prototype.complete = function (stage_id) {
+    if (this.status() < Quest.Status.Completed) {
+        if (this.has(stage_id)) {
+            if (this.stage(stage_id).complete() === Quest.Status.Completed) {
+                if (this.remaining() > 0 || this.isOptional()) {
+                    this.notify(this.displayTitle() + ' updated.').playMedia('update');
+                }
+                else {
+                    return this.complete();
+                    //this.set(Quest.Status.Completed).notify(this.displayTitle() + ' completed.').playMedia('complete').checkNext();
+                }
+                return true;
+            }
+        }
+        else {
+            this.set(Quest.Status.Completed);
+            this.notify(this.displayTitle() + ' completed.').playMedia('complete').checkNext();
+        }
+    }
+    return this.completed();
+};
+/**
+ * Complete this quest and all the stages (used to mark as totally completed)
+ * @returns Quest
+ */
+Quest.prototype.completeAll = function(){
+    this.stages(true).forEach( stage => stage.complete() );
+    this.set( Quest.Status.Completed );
+    return this;
+};
+/**
+ * @param {Number} status 
+ * @returns Quest
+ */
+Quest.prototype.cancel = function () {
+    if (this.status() < Quest.Status.Completed) {
+        this.set(Quest.Status.Failed).notify(this.displayTitle() + ' failed.').playMedia('fail');
+    }
+    return this.status() === Quest.Status.Failed;
+};
+
+/**
+* @returns Object
+*/
+Quest.prototype.dump = function () {
+    return {
+        'name': this.name(),
+        'title': this.title(),
+        'category': this.category(),
+        'icon': this.icon(),
+        'behaviour': this.behaviour(),
+        'status': this.status(),
+        'stages': this.stages(true).map((s) => output.stages.push(s.dump())),
+    };
+};
+/**
+ * @param {String} media 
+ * @returns Quest
+ */
+Quest.prototype.playMedia = function (media) {
+    QuestMan.playMedia(media);
+    return this;
+};
+/**
+ * @param {String} message 
+ * @returns Quest
+ */
+Quest.prototype.notify = function (message) {
+    QuestMan.notify(message);
+    return this;
+};
 
 Quest.INVALID = 'INVALID';
 
@@ -1456,6 +1713,24 @@ Quest.Status = {
     'Active': 2,
     'Completed': 3,
     'Failed': 4
+};
+/**
+ * @param {Number} status 
+ * @returns String[]
+ */
+Quest.CheckStatus = function( status ){
+    switch( status ){
+        case Quest.Status.Hidden:
+            return ['ready','hidden'];
+        case Quest.Status.Active:
+            return ['running','active'];
+        case Quest.Status.Completed:
+            return ['completed'];
+        case Quest.Status.Failed:
+            return ['failed','cancelled'];
+        default:
+            return [];
+    }
 };
 Quest.Status.display = function (status) {
     switch (status) {
@@ -1467,7 +1742,7 @@ Quest.Status.display = function (status) {
     }
 };
 
-Quest.Behavior = {
+Quest.Behaviour = {
     'Default': 'default',
     'Linear': 'linear',
     'Optional': 'optional',
@@ -1480,132 +1755,187 @@ Quest.Category = {
 };
 
 /**
- * @param string name
+ * @param string quest
+ * @param string stage
  * @param string title
  * @param string details
  * @param number objective
+ * @param number varId
+ * @param number varAmount
+ * @param string updateMethod
  * @returns QuestStage
  */
-function QuestStage(name, title, details, objective) {
+function QuestStage(quest, stage, title, details, objective, varId, varAmount, updateMethod) {
+    this._quest = QuestMan.ParseName(quest);
+    this._name = QuestMan.ParseName(stage);
+    this._title = QuestMan.Translate(`${this._quest}.${this._name}.title`, title || stage);
+    this._details = QuestMan.Translate(`${this._quest}.${this._name}.details`, details || '');
+    this._objecive = objective || 1;
 
-    var _S = {
-        'name': name,
-        'title': title,
-        'details': details,
-        'objective': objective
-        //'self':this
-    };
-    /**
-     * @returns Quest.Data
-     */
-    //this.db = () => new Quest.Data();
-    this.db = () => $gameParty.QuestData();
-    /**
-     * @returns Object
-     */
-    this.dump = function () {
-        return {
-            'name': _S.name,
-            'title': _S.title,
-            'details': _S.details,
-            'objective': _S.objective,
-            'status': this.current()
-        };
-    };
-    /**
-     * @returns String
-     */
-    this.quest = () => Quest.INVALID;
-    /**
-     * @returns  Boolean
-     */
-    this.check = function () { };
-    /**
-     * @param {Boolean} fullName show as QuestName.StageName (true) or only as StageName (false:default)
-     * @returns String
-     */
-    this.name = function (fullName) { return typeof fullName === 'boolean' && fullName ? this.quest() + '.' + _S.name : _S.name; };
-    /**
-     * @returns String
-     */
-    this.stageId = () => _S.name;
-    /**
-     * @returns String
-     */
-    this.title = () => _S.title;
-    /**
-     * @returns String
-     */
-    this.details = () => _S.details;
-    /**
-     * @returns String
-     */
-    this.objective = () => _S.objective;
-    /**
-     * @returns Number
-     */
-    this.value = function () {
-        return this.db().get(this.quest(), this.name());
-    };
-    /**
-     * @returns Number
-     */
-    this.current = function () { return this.value(); };
-    /**
-     * Complete this stage if still in progress
-     * @returns Number
-     */
-    this.complete = function () {
-        if (this.status() < Quest.Status.Completed) {
-            this.db().set(this.quest(), this.name(), this.objective());
-        }
-        //call the parent quest check method
-        //this.check();
-        return this.status();
-    };
-    /**
-     * Make an increment over the stage's status
-     * @param {Number} amount
-     * @returns Number
-     */
-    this.update = function (amount) {
-        if (this.value() + amount < this.objective()) {
-            this.db().update(this.quest(), this.name(), amount);
-        }
-        else {
-            this.db().set(this.quest(), this.name(), this.objective());
-        }
-        //this.check();
-        return this.status();
-    };
-    /**
-     * @returns Float
-     */
-    this.progress = function () {
-        return this.value() / parseFloat(this.objective());
-    };
-    /**
-     * @returns Number
-     */
-    this.status = function () {
-        return this.completed() ? Quest.Status.Completed : Quest.Status.Active;
-    }
-    /**
-     * @returns Boolean
-     */
-    this.completed = function () {
-        return this.value() >= this.objective();
-    };
-    /**
-     * @returns QuestStage
-     */
-    this.reset = function () {
-        //console.log( this.name());
-        this.db().set(this.quest(), this.name(), 0);
-        return this;
-    };
+    this._varId = varId || 0;
+    this._varAmount = varAmount || 1;
+    this._updateMethod = updateMethod || this.VariableMethod.Set;
 
     return this;
+};
+/**
+ * @returns Quest.Data
+ */
+QuestStage.prototype.data = function () {
+    return $gameParty.QuestData();
+};
+/**
+ * @param {Boolean} fullName show as QuestName.StageName (true) or only as StageName (false:default)
+ * @returns String
+ */
+QuestStage.prototype.name = function (fullName) {
+    return typeof fullName === 'boolean' && fullName ? this.quest() + '.' + this._name : this._name;
+};
+/**
+ * @returns String
+ */
+QuestStage.prototype.title = function () { return this._title; };
+/**
+ * @returns String
+ */
+QuestStage.prototype.details = function () { return this._details; };
+/**
+ * @returns String
+ */
+QuestStage.prototype.objective = function () { return this._objecive; };
+/**
+ * @returns Object
+ */
+QuestStage.prototype.dump = function () {
+    return {
+        'name': this.name(),
+        'title': this.title(),
+        'details': this.details(),
+        'objective': this.objective(),
+        'status': this.current()
+    };
+};
+/**
+ * @returns String
+ */
+QuestStage.prototype.quest = function(){
+    return this._quest;
+};
+/**
+ * @returns String
+ */
+QuestStage.prototype.stageId = function () { return this._name; };
+/**
+ * @param {Boolean} display
+ * @returns String
+ */
+QuestStage.prototype.title = function (display) {
+    if (typeof display === 'boolean' && display) {
+        return this.objective() > 1 ? `${this._title} ( ${this.value()} / ${this.objective()} )` : this._title;
+    }
+    return this._title;
+};
+/**
+ * @returns Number
+ */
+QuestStage.prototype.value = function () { return this.data().get(this.quest(), this.name()); };
+/**
+ * @returns Number
+ */
+QuestStage.prototype.current = function () { return this.value(); };
+/**
+ * Complete this stage if still in progress
+ * @returns Number
+ */
+QuestStage.prototype.complete = function () {
+    if (this.status() < Quest.Status.Completed) {
+        this.data().set(this.quest(), this.name(), this.objective());
+    }
+    return this.status();
+};
+/**
+ * Make an increment over the stage's status
+ * @param {Number} amount
+ * @returns Number
+ */
+QuestStage.prototype.update = function (amount) {
+    if (this.status() === Quest.Status.Active) {
+        var value = this.value() + ( typeof amount === 'number' && amount > 0 ? amount : 1);
+        var points = value < this.objective() ? value : this.objective();
+        this.data().set( this.quest(), this.name(), points );
+        //QuestMan.DebugLog(`Adding ${points} points to ${this.quest()}.${this.name()}`);
+        /*if (this.value() + amount < this.objective()) {
+            this.data().update(this.quest(), this.name(), amount);
+        }
+        else {
+            this.data().set(this.quest(), this.name(), this.objective());
+        }*/
+
+        if (this.status() === Quest.Status.Completed) { this.updateGameVar(); }
+    }
+    return this.status();
+};
+/**
+ * @returns Float
+ */
+QuestStage.prototype.progress = function () {
+    return this.value() / parseFloat(this.objective());
+};
+/**
+ * @returns Number
+ */
+QuestStage.prototype.status = function () {
+    return this.completed() ? Quest.Status.Completed : Quest.Status.Active;
+}
+/**
+ * @returns Boolean
+ */
+QuestStage.prototype.completed = function () {
+    return !this.active();
+};
+/**
+ * @returns Boolean
+ */
+QuestStage.prototype.active = function () {
+    return this.value() < this.objective();
+};
+/**
+ * @returns QuestStage
+ */
+QuestStage.prototype.reset = function () {
+    //console.log( this.name());
+    this.data().set(this.quest(), this.name(), 0);
+    return this;
+};
+/**
+ * @returns Boolean
+ */
+QuestStage.prototype.hasGameVar = function () { return this._varId > 0; };
+/**
+ * @returns QuestStage
+ */
+QuestStage.prototype.updateGameVar = function () {
+    if (this.hasGameVar()) {
+        var value = $gameVariables.value(this._varId);
+        switch (this._updateMethod) {
+            case this.VariableMethod.Add:
+                $gameVariables.setValue(this._varId, value + this._varAmount);
+                break;
+            case this.VariableMethod.Substract:
+                $gameVariables.setValue(this._varId, value - this._varAmount > 0 ? value - this._varAmount : 0);
+                break;
+            case this.VariableMethod.Set:
+                $gameVariables.setValue(this._varId, this._varAmount);
+                break;
+        }
+    }
+    return this;
+};
+
+QuestStage.VariableMethod = {
+    'Add': 'add',
+    'Substract': 'sub',
+    'Set': 'set',
 };
 
 
@@ -1613,20 +1943,56 @@ function QuestStage(name, title, details, objective) {
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 ////    Functions
 ///////////////////////////////////////////////////////////////////////////////////////////////////
+/**
+ * @param {String} quest 
+ * @param {String} status 
+ * @returns Number
+ */
+function quest_check( quest , status ){
+    if( typeof quest === 'string' && quest.length ){
+        var name = quest.split('.');
+        return Quest.CheckStatus( quest_status( name[0] , name.length > 1 ? name[1] : '' )).includes( status );
+    }
+    return false;
+};
+/**
+ * @returns String[]
+ */
+function quest_categories(){
+    return Object.keys( QuestMan.categories( ) );
+}
+/**
+ * @param {String} status
+ * @param {String} category
+ * @returns String[]
+ */
+function quest_list( status , category ){
+    var list = QuestMan.quests(true);
 
-
-
+    if( typeof status === 'string' && status.length ){
+        list = list.filter( function( quest ){
+            return Quest.CheckStatus(quest.status()).includes(status);
+        });
+    }
+    if( typeof category === 'string' && category.length ){
+        list = list.filter( function( quest ){
+            return quest.category() === category;
+        });
+    }
+    
+    return list.map( quest => quest.name() );
+};
 /**
  * @param {String} quest
  * @param {String} stage
  * @returns Number
  */
 function quest_status(quest, stage) {
-    var q = QuestMan.quest(quest);
+    var q = QuestMan.quest(QuestMan.ParseName(quest));
     if (q !== null) {
         if (typeof stage === 'string' && stage.length) {
-            var s = q.stage(stage);
-            return s !== false && !s.completed() ? Quest.Status.Active : Quest.Status.Completed;
+            var s = q.stage(QuestMan.ParseName(stage));
+            return s !== null && !s.completed() ? Quest.Status.Active : Quest.Status.Completed;
         }
         return q.status();
     }
@@ -1635,6 +2001,21 @@ function quest_status(quest, stage) {
 
     return Quest.Status.Invalid;
 }
+/**
+ * @param {String} quest 
+ * @param {String} stage 
+ * @returns Number
+ */
+function quest_stage( quest , stage ){
+    var q = QuestMan.quest(QuestMan.ParseName(quest));
+    if (q !== null) {
+        if (typeof stage === 'string' && stage.length) {
+            var s = q.stage(QuestMan.ParseName(stage));
+            return s !== null ? s.value() : 0;
+        }
+    }
+    return 0;
+};
 /**
  * Obsolete function support
  * @param {String} quest
@@ -1648,16 +2029,16 @@ function quest_running(quest, stage) { return quest_active(quest, stage); }
  * @returns Boolean
  */
 function quest_active(quest, stage) {
-    var q = QuestMan.quest(quest);
+    var q = QuestMan.quest(QuestMan.ParseName(quest));
     if (q !== null) {
         if (q.active()) {
             if (typeof stage === 'string' && stage.length) {
                 //stages
-                var s = q.stage( stage );
-                if( q.behavior() === Quest.Behavior.Linear ){
-                    return s !== false && !s.completed() && s.name() === q.current().name();
+                var s = q.stage(QuestMan.ParseName(stage));
+                if (q.behaviour() === Quest.Behaviour.Linear) {
+                    return s !== null && !s.completed() && s.name() === q.current().name();
                 }
-                return s !== false && !s.completed();
+                return s !== null && !s.completed();
             }
             return true;
         }
@@ -1674,39 +2055,40 @@ function quest_active(quest, stage) {
  * @returns Boolean
  */
 function quest_completed(quest, stage) {
-    var q = QuestMan.quest( quest );
+    var q = QuestMan.quest(QuestMan.ParseName(quest));
     if (q !== null) {
         if (typeof stage === 'string' && stage.length) {
-            var s = q.stage(stage);
-            return s !== false && s.completed();
+            var s = q.stage(QuestMan.ParseName(stage));
+            return s !== null && s.completed();
         }
         return q.completed();
     }
     return false;
 }
 /**
- * @param {String} name 
+ * @param {String} quest 
  * @returns Boolean
  */
-function quest_ready(name) {
-    return quest_status(name) === Quest.Status.Hidden;
+function quest_ready(quest) {
+    return quest_status(QuestMan.ParseName(quest)) === Quest.Status.Hidden;
 }
 /**
- * @param {String} name 
+ * @param {String} quest 
  * @returns Boolean
  */
-function quest_failed(name) {
-    return quest_status(name) === Quest.Status.Failed;
+function quest_failed(quest) {
+    return quest_status(QuestMan.ParseName(quest)) === Quest.Status.Failed;
 }
 /**
  * Start a quest
  * @param {String} quest 
+ * @param {Boolean} reset 
  * @returns Boolean
  */
-function quest_start(quest) {
-    var q = QuestMan.quest(quest);
+function quest_start(quest, reset) {
+    var q = QuestMan.quest(QuestMan.ParseName(quest));
     if (q !== null) {
-        return q.start();
+        return typeof reset === 'boolean' && reset ? q.reset().start() : q.start();
     }
     else {
         QuestMan.DebugLog('Invalid quest ID ' + quest);
@@ -1721,14 +2103,32 @@ function quest_start(quest) {
  */
 function quest_update(quest, stage, progress) {
     //console.log(`${id}: ${progress || 1}`);
-    var q = QuestMan.quest(quest);
+    var q = QuestMan.quest(QuestMan.ParseName(quest));
     if (q !== null) {
-        return q.update(stage || '', progress);
+        return q.update( typeof stage === 'string' ? QuestMan.ParseName(stage) : '', progress);
     }
 
     QuestMan.DebugLog('Invalid quest ID ' + quest);
 
     return false;
+}
+/**
+ * Return the list of QuestStages left to complete. Will return 0 if the quest doesn't exist.
+ * Backwards compatibility. Use quest_remaining() instead
+ * @param {String} quest 
+ * @returns Number
+ */
+function quest_stages_left(quest) {
+    return quest_remaining( quest );
+}
+/**
+ * Return the list of QuestStages left to complete. Will return 0 if the quest doesn't exist.
+ * @param {String} quest 
+ * @returns Number
+ */
+function quest_remaining(quest) {
+    var q = QuestMan.quest(QuestMan.ParseName(quest));
+    return q !== null ? q.remaining() : 0;
 }
 /**
  * Complete a quest or quest stage
@@ -1738,11 +2138,11 @@ function quest_update(quest, stage, progress) {
  */
 function quest_complete(quest, stage) {
 
-    var q = QuestMan.quest(quest);
+    var q = QuestMan.quest(QuestMan.ParseName(quest));
     if (q !== null) {
-        return typeof stage === 'string' && stage.length ?
-        q.complete(stage) :
-        q.complete();
+        return typeof stage === 'string' && stage.length > 0 ?
+            q.complete(QuestMan.ParseName(stage)) :
+            q.complete();
     }
 
     QuestMan.DebugLog('Invalid quest ID ' + quest);
@@ -1750,11 +2150,20 @@ function quest_complete(quest, stage) {
     return false;
 }
 /**
+ * Complete a quest or quest stage
+ * @param {String} name Quest ID
+ * @returns Boolean
+ */
+function quest_complete_all(quest) {
+    var q = QuestMan.quest(QuestMan.ParseName(quest));
+    return q !== null ? q.completeAll().status() : Quest.Status.Invalid;
+}
+/**
  * Cancel a quest
  * @param {String} quest
  */
 function quest_cancel(quest) {
-    var q = QuestMan.quest(quest);
+    var q = QuestMan.quest(QuestMan.ParseName(quest));
     if (q !== null) {
         q.cancel();
     }
@@ -1769,7 +2178,7 @@ function quest_cancel(quest) {
  */
 function quest_reset(quest) {
 
-    var q = QuestMan.quest(quest);
+    var q = QuestMan.quest(QuestMan.ParseName(quest));
     if (q !== null) {
         q.reset();
         return true;
@@ -1950,24 +2359,15 @@ QuestCatWindow.prototype.nextCategory = function () {
 QuestCatWindow.prototype.windowWidth = function () {
     return parseInt(Graphics.boxWidth / QuestLogScene.LayoutSize);
 };
-/**
- * @param {String} category 
- * @returns Object
- */
-QuestCatWindow.prototype.importCategoryFormat = function (category) {
-    return QuestMan.getCategoryFormat(category);
-};
-
 QuestCatWindow.prototype.renderCategory = function () {
-    var format = this.importCategoryFormat(this.category);
     var text = this.category ? this.category : 'All';
-    if (format.color > 0) {
-        this.changeTextColor(this.textColor(format.color));
-    }
-    if (format.icon > 0) {
+    var color = QuestMan.getCategoryColor(this.category);
+    var icon = QuestMan.getCategoryIcon(this.category);
+    if (icon > 0) {
         var base_line = Math.max((28 - this.standardFontSize()) / 2, 0);
-        this.drawIcon(format.icon, 0, base_line);
+        this.drawIcon(icon, 0, base_line);
     }
+    this.changeTextColor(this.textColor(color));
     this.drawText(text, 0, 0, this.contentsWidth(), 'center');
     this.changeTextColor(this.normalColor());
 }
@@ -2201,7 +2601,7 @@ QuestDetailWindow.prototype.setItem = function (name) {
 QuestDetailWindow.prototype.refresh = function () {
     this.contents.clear();
     if (this.questData && this.questData.name() !== Quest.INVALID) {
-        this.renderQuestDetail(this.questData);
+        this.renderQuestData(this.questData);
     }
     else {
         this.renderEmptyQuest();
@@ -2219,21 +2619,17 @@ QuestDetailWindow.prototype.standardFontSize = function () { return 20; };
 QuestDetailWindow.prototype.lineHeight = function () { return 30; };
 QuestDetailWindow.prototype.completedItemOpacity = function () { this.contents.paintOpacity = 192; };
 QuestDetailWindow.prototype.debugItemOpacity = function () { this.contents.paintOpacity = 128; };
+QuestDetailWindow.prototype.baseLine = function () { return Math.max((28 - this.standardFontSize()) / 2, 0); };
 /**
  * @param {Quest} quest
  */
-QuestDetailWindow.prototype.renderQuestDetail = function (quest) {
+QuestDetailWindow.prototype.renderQuestData = function (quest) {
 
     //pass  through anonymous
-    var _renderer = this;
-
     this.changeTextColor(this.normalColor());
     // quest heading
-
-    var line_height = this.lineHeight();
-    var base_line = Math.max((28 - this.standardFontSize()) / 2, 0);
+    var base_line = this.baseLine();
     var width = this.contentsWidth();
-    var height = this.contentsHeight();
     var icon = quest.icon();
     //TITLE
     if (icon) {
@@ -2243,42 +2639,62 @@ QuestDetailWindow.prototype.renderQuestDetail = function (quest) {
     else {
         this.drawTextEx(quest.title(), 0, base_line, width);
     }
-
     this.changeTextColor(this.textColor(23));
     //CATEGORY
     this.drawText(quest.category(), 40, base_line, width - 40, 'right');
+
     this.changeTextColor(this.textColor(24));
+
     var line = Math.max(32, this.lineHeight());
-    this.drawHorzLine(line);
-
-    //var y = line + line_height;
-    var y = line;
-
-    //split text in lines
-    quest.displayDetail(50).forEach(function (line) {
-        y += line_height;
-        _renderer.drawTextEx(line, 0, y, width);
-    });
 
     this.drawHorzLine(line);
+
+    this.renderQuestDetail(quest.displayDetail(QuestMan.detailsLength()), line);
+    //this.drawHorzLine(line);
 
     //RENDER STAGES
-    var behavior = quest.behavior();
+    this.renderQuestStages(QuestMan.debug() || quest.status() > Quest.Status.Active ? quest.stages(true) : quest.visibleStages(), quest.isLinear() );
+
+    this.drawGauge(0, this.contentsHeight() - 10 - this.lineHeight() * 2, width, quest.progress(), this.textColor(4), this.textColor(6));
+
+    this.renderQuestStatus(quest.status());
+
+    // REWARD
+    if (quest.hasReward()) {
+        this.renderQuestReward(quest.reward(), !quest.completed());
+    }
+};
+/**
+ * @param {String|String[]} text 
+ * @param {Number} y 
+ */
+QuestDetailWindow.prototype.renderQuestDetail = function (text, y) {
+    if (typeof text === 'string') {
+        this.drawTextEx(text, 0, y + this.lineHeight(), this.contentsWidth());
+    }
+    else if (Array.isArray(text)) {
+        for (var i = 0; i < text.length; i++) {
+            this.drawTextEx(text[i], 0, y + (this.lineHeight() * (i + 1)), this.contentsWidth());
+        }
+    }
+};
+/**
+ * 
+ * @param {QuestStage[]} stages 
+ * @param {Boolean} hideInactive 
+ */
+QuestDetailWindow.prototype.renderQuestStages = function (stages, hideInactive ) {
     var _debugHidden = false;
     var _debug = QuestMan.debug();
-    var _stages = _debug || quest.status() > Quest.Status.Active ? quest.stages(true) : quest.visibleStages();
-    y = height - (line_height * 2) - (line_height + 8) * _stages.length;
-    _stages.forEach(function (stage) {
-
-        var progress = stage.current();
-        var objective = stage.objective();
-
-        var text = objective > 1 ? stage.title() + ' ( ' + progress + ' / ' + objective + ' )' : stage.title();
-
+    var line_height = this.lineHeight();
+    var base_line = this.baseLine();
+    y = this.contentsHeight() - (line_height * 2) - (line_height + 8) * stages.length;
+    var _renderer = this;
+    stages.forEach(function (stage) {
         if (_debugHidden) {
             _renderer.debugItemOpacity();
         }
-        else if (progress < objective) {
+        else if (stage.active()) {
             _renderer.drawIcon(QuestMan.icon('active'), 0, y + 4);
             _renderer.changeTextColor(_renderer.normalColor());
         }
@@ -2286,33 +2702,38 @@ QuestDetailWindow.prototype.renderQuestDetail = function (quest) {
             _renderer.drawIcon(QuestMan.icon('completed'), 0, y + 4);
             _renderer.completedItemOpacity();
         }
-        _renderer.drawText(text, 35, base_line + y);
+        _renderer.drawText(stage.title(true), 35, base_line + y);
         //_renderer.drawTextEx( text, 35, y , width - 35 );
         _renderer.changeTextColor(_renderer.normalColor());
         _renderer.changePaintOpacity(true);
 
         y += line_height + 8;
 
-        if (_debug && !_debugHidden && behavior === Quest.Behavior.Linear && progress < objective) {
+        if (_debug && !_debugHidden && hideInactive && stage.active()) {
             _debugHidden = true;
         }
     });
-
-    this.drawGauge(0, height - line_height * 2, width, quest.progress(), this.textColor(4), this.textColor(6));
-
-    // REWARD
-    if (quest.reward().length) {
-        if (quest.status() < Quest.Status.Completed) {
-            _renderer.changeTextColor(_renderer.textColor(8));
-        }
-        var rewardTag = QuestMan.string('reward', '');
-        this.drawTextEx(rewardTag.length > 0 ?
-            rewardTag + ': ' + quest.reward() :
-            quest.reward(), 0, height - line_height, width);
+};
+/**
+ * @param {String} reward 
+ * @param {Boolean} locked 
+ */
+QuestDetailWindow.prototype.renderQuestReward = function (reward, locked) {
+    if (typeof locked === 'boolean' && locked) {
+        this.changeTextColor(this.textColor(8));
     }
+    var rewardTag = QuestMan.string('reward', '');
+    this.drawTextEx(rewardTag.length > 0 ? `${rewardTag}: ${reward}` : reward, 0, this.contentsHeight() - this.lineHeight() - 4, this.contentsWidth());
+};
+/**
+ * @param {Number} status 
+ */
+QuestDetailWindow.prototype.renderQuestStatus = function (status) {
 
     // STATUS
-    switch (quest.status()) {
+    switch (status) {
+        case Quest.Status.Invalid:
+            return;
         case Quest.Status.Active:
             this.changeTextColor(this.textColor(6));
             break;
@@ -2323,7 +2744,7 @@ QuestDetailWindow.prototype.renderQuestDetail = function (quest) {
             this.changeTextColor(this.textColor(2));
             break;
     }
-    this.drawText(quest.displayStatus(), 0, height - line_height, width, 'right');
+    this.drawText(Quest.Status.display(status), 0, this.contentsHeight() - this.lineHeight() - 4, this.contentsWidth(), 'right');
     this.changeTextColor(this.normalColor());
 };
 /**
@@ -2336,9 +2757,9 @@ QuestDetailWindow.prototype.renderEmptyQuest = function () {
     this.drawText("-- Empty log --", 10, y, this.contentsWidth(), 'center');
 
     this.changeTextColor(this.textColor(8));
-    this.drawText("Select a quest category with Left and Right", 0, y + 40, this.contentsWidth(), 'center');
-    this.drawText("Select a quest with Up and Down", 0, y + 80, this.contentsWidth(), 'center');
-    this.drawText("Switch the quest status filter with Action", 0, y + 120, this.contentsWidth(), 'center');
+    this.drawText("Left and Right to filter Quest Status", 0, y + 40, this.contentsWidth(), 'center');
+    this.drawText("Up and Down to select Quest", 0, y + 80, this.contentsWidth(), 'center');
+    this.drawText("Action to switch Quest Category filter", 0, y + 120, this.contentsWidth(), 'center');
     this.changeTextColor(this.normalColor(8));
 };
 
@@ -2347,6 +2768,7 @@ QuestDetailWindow.prototype.renderEmptyQuest = function () {
     QuestManager_registerMenu();
     QuestManager_RegisterQuestData();
     QuestManager_registerCommands();
+    QuestManager_registerEscapeCharacters();
     QuestManager_registerNewGame();
 
 })( /* autorun */);
