@@ -1,0 +1,400 @@
+//=============================================================================
+// KunAnimationPack.js
+//=============================================================================
+/*:
+ * @filename KunAnimationPack.js
+ * @plugindesc Extra animation packs for Kun Interactive Picture Animations
+ * @version 3.31
+ * @author KUN
+ * @target MC | MZ
+ * 
+ * @help
+ * 
+ * Use with KunAnimations Plugin to avoid overloading the plugin parameters
+ * 
+ * @param name
+ * @type text
+ * @text Pack Name
+ * @desc define a tag or a name for this animation pack
+ * 
+ * @param scenes
+ * @type struct<Scene>[]
+ * @text Scenes
+ * @desc Define the DataBase of Animation Scene Controllers (keep it clean and easy!!)
+ * 
+ * @param profiles
+ * @type struct<Profile>[]
+ * @text Profiles
+ * @desc Create scene packages associated with an alias to quickly arrange different stages
+ * 
+ */
+/*~struct~Scene:
+ *
+ * @param source
+ * @text Source Picture Pack
+ * @desc Add one or more source pictures with the same frameset columns and rows, to use with the same animation rules. Duplicated pictures will be discarded.
+ * @type file[]
+ * @require 1
+ * @dir img/pictures/
+ * 
+ * @param cols
+ * @text Columns
+ * @type number
+ * @min 1
+ * @max 32
+ * @default 1
+ * 
+ * @param rows
+ * @text Rows
+ * @type number
+ * @min 1
+ * @max 32
+ * @default 1
+ * 
+ * @param fps
+ * @text Frames Per Second
+ * @desc Default FPS for this frameset (leave to 0 to get master FPS as default)
+ * @type number
+ * @min 0
+ * @default 0
+ * 
+ * @param mode
+ * @text Animation Mode
+ * @desc Enable interactive or dynamic events for this scene
+ * @type select
+ * @option Default Animation
+ * @value default
+ * @option Moving Animation
+ * @value move
+ * @option Interactive Animation
+ * @value touch
+ * @option Static (no animation)
+ * @value static
+ * @default default
+ * 
+ * @param framesets
+ * @type struct<Animation>[]
+ * @text Animations
+ * @desc Animation Frameset Collection
+ * @default []
+ * 
+ * @param hotspots
+ * @type struct<Spot>[]
+ * @text HotSpots
+ * @desc Add the interactive spots here
+ * @default []
+ * 
+ * @param soundProfile
+ * @type text[]
+ * @text Sound Set Profile
+ * @desc Add here the sound bank prefix for each picture souce when required
+ * 
+ * @param soundLoop
+ * @parent soundProfile
+ * @text Sound Loop
+ * @desc Play sound effects after N loops
+ * @type number
+ * @min 0
+ * @max 10
+ * @default 0
+ * 
+ */
+/*~struct~Animation:
+ * @param name
+ * @text Name
+ * @type text
+ * @default animation
+ * 
+ * @param frames
+ * @text Frames
+ * @type number[]
+ * @min 0
+ * @desc List of frames to play in this animation
+ * @default []
+ * 
+ * @param type
+ * @text Animation Type
+ * @type select
+ * @option Forward (default)
+ * @value forward
+ * @option Reverse
+ * @value reverse
+ * @option Ping-Pong
+ * @value ping-pong
+ * @option Static
+ * @value static
+ * @default forward
+ * 
+ * @param fps
+ * @text Frames Per Second
+ * @desc Default FPS for this frameset (leave to 0 to get master FPS as default)
+ * @type number
+ * @min 0
+ * @default 0
+ * 
+ * @param loops
+ * @type number
+ * @text Loops
+ * @desc number of times the animation will play before switching to the next animation. Leave it to 0 for endless loops (no next animation)
+ * @default 0
+ * 
+ * @param next
+ * @text Next FrameSets
+ * @type text[]
+ * @desc Define the next frameset to call. If more than one specified, they will be randomly called
+ * 
+ * @param offsetX
+ * @text X Offset
+ * @type number
+ * @default 0
+ * 
+ * @param offsetY
+ * @text Y Offset
+ * @type number
+ * @default 0
+ * 
+ * @param spots
+ * @type struct<Touch>[]
+ * @text Spots
+ * @desc Interactive Spots to fire events
+ * @default []
+ * 
+ * @param conditions
+ * @type struct<Condition>[]
+ * @text Conditions
+ * @desc Enable this Animation when meeting these conditions
+ * 
+ * @param tags
+ * @text Tags
+ * @type text[]
+ * @desc Define tags to filter related animations
+ * 
+ * @param sounds
+ * @text Sound Sets
+ * @desc Type in a defined sound bank name to play a special sound set each time this frameset is started.
+ * @type text[]
+ * @default []
+ * 
+ */
+/*~struct~Touch:
+ * 
+ * @param name
+ * @text Name
+ * @type text
+ * @default touch
+ * 
+ * @param next
+ * @text Next Animation
+ * @desc Jump to Frameset on touched (allow mrandom options when more than 1)
+ * @type text[]
+ * @default []
+ * 
+ */
+/*~struct~Spot:
+ * 
+ * @param name
+ * @text Name
+ * @type text
+ * @default touch
+ * 
+ * @param x1
+ * @text X1
+ * @type number
+ * @min 0
+ * @desc X origin coordinate
+ * 
+ * @param y1
+ * @text Y1
+ * @type number
+ * @min 0
+ * @desc Y origin coordinate
+ * 
+ * @param x2
+ * @text X2
+ * @type number
+ * @min 0
+ * @desc X destination coordinate
+ * 
+ * @param y2
+ * @text Y2
+ * @type number
+ * @min 0
+ * @desc Y destination coordinate
+ * 
+ * @param trigger
+ * @text On Click
+ * @type select
+ * @option Instant Run
+ * @value instant
+ * @option Queue
+ * @value queue
+ * @option Set Frame
+ * @value frame
+ * @option Next Frame
+ * @value next
+ * @option Ignore
+ * @value ignore
+ * @default queue
+ * 
+ * @param actions
+ * @type struct<Action>[]
+ * @text Actions
+ * @desc Update Game Variables and Switches when using this Spot.
+ * 
+ * @param conditions
+ * @type struct<Condition>[]
+ * @text Conditions
+ * @desc Enable this HotSpot when meeting these conditions
+ * 
+ * @param sfx
+ * @text Touch Audio SFX
+ * @desc Define a specific sound effect
+ * @type file
+ * @require 1
+ * @dir audio/se/
+ * 
+ * @param tags
+ * @type text[]
+ * @name Tags
+ * @desc add tags to categorize the spot selection
+ * 
+ * @param varId
+ * @text Game Variable ID
+ * @type variable
+ * @min 0
+ * @desc (Obsolete) Game Variable Mutator. Leave to 0 to not update variables. Use Actions instead.
+ * @default 0
+ * 
+ * @param behavior
+ * @parent varId
+ * @text Update Behavior
+ * @desc (Obsolete) How to modify the value on Game Variable ID. Use Actions instead
+ * @type select
+ * @option Add (default)
+ * @value add
+ * @option Substract
+ * @value sub
+ * @option Set
+ * @value set
+ * @option Set Frame
+ * @value frame
+ * @option Next Frame
+ * @value next
+ * @option Ignore
+ * @value ignore
+ * @default add
+ * 
+ * @param amount
+ * @parent varId
+ * @text Update Amount
+ * @desc (Obsolete) Use Actions instead
+ * @type number
+ * @min 1
+ * @default 1
+ * 
+ */
+/*~struct~Action:
+ * @param tag
+ * @text Tag
+ * @type text
+ * @desc Set a tag for this action used for a filtered action selection
+ * 
+ * @param var
+ * @type variable
+ * @text Game Variable
+ * @desc define a game variable to update with this action
+ * @min 0
+ * @default 0
+ * 
+ * @param op
+ * @text Operator
+ * @desc Operation type to run on the Game Variable
+ * @type select
+ * @option Add
+ * @value add
+ * @option Sub
+ * @value sub
+ * @option Set
+ * @value set
+ * @option Current Frame
+ * @value frame
+ * @option Next Frame
+ * @value next
+ * @default set
+ * 
+ * @param val
+ * @text Value
+ * @desc Value to update the game variable with
+ * @type number
+ * @min 0
+ * 
+ */
+/*~struct~Condition:
+ *
+ * @param var
+ * @type variable
+ * @text Game Variable
+ * @desc define a game variable to check for this condition
+ * @min 0
+ * @default 0
+ * 
+ * @param op
+ * @text Operator
+ * @desc Select the type of operation to cast over the value for this Game Variable
+ * @type select
+ * @option Greater
+ * @value greater
+ * @option Greater or equal
+ * @value greater_equal
+ * @option Equal
+ * @value equal
+ * @option Less or equal
+ * @value less_equal
+ * @option Less
+ * @value less
+ * 
+ * @param val
+ * @type number
+ * @text Value
+ * @desc Operate with this value
+ * @min 0
+ * @default 0
+ * 
+ * @param target
+ * @type boolean
+ * @text Value as Variable
+ * @desc Map value as a Game Variable which provides the real value. Value must be a valid Game Variable.
+ * @default false
+ * 
+ * @param on
+ * @type switch[]
+ * @text Game Switch ON
+ * @desc define which game switches must be ON for this condition
+ *
+ * @param off
+ * @type switch[]
+ * @text Game Switch OFF
+ * @desc define which game switches must be OFF for this condition
+ * 
+ */
+/*~struct~Profile:
+ * @param profile
+ * @type text
+ * @desc Profile name
+ * @default profile
+ * 
+ * @param start
+ * @type text
+ * @text Starting frames
+ * @desc Define the starting frameset for this animation group
+ * 
+ * @param pictures
+ * @text picture stages to run within this profile
+ * @type file[]
+ * @require 1
+ * @dir img/pictures/
+ */
+
+/*( function(){
+    //console.log('KunAnimationPack Loaded');
+})();*/

@@ -3,8 +3,8 @@
 //=============================================================================
 /*:
  * @filename KunAnimations.js
- * @plugindesc Kun Interactive Picture Animations - Animate pictures with custom framesets and commands, now featuring an interactive framework to click over specific hotspots depending on the frameset running.
- * @version 1.99
+ * @plugindesc Kun Interactive Picture Animations (Amirian Release) - Animate pictures with custom framesets and commands, now featuring an interactive framework to click over specific hotspots depending on the frameset running.
+ * @version 4.62
  * @author KUN
  * @target MC | MZ
  * 
@@ -12,7 +12,7 @@
  * 
  * COMMANDS:
  * 
- *      KunAnimations set animation-name [setName] [wait frames:frame_offset]
+ *      KunAnimations play|set animation-name [setName] [wait frames:frame_offset]
  *          Switch animation frameset setName for animation-name
  *          If offsetVarx and offsetVarY are defined, both vars will apply the defined offset
  *          Use offsetScale % to scale the offset displacement for each coordinate
@@ -24,56 +24,114 @@
  *      KunAnimations fps animation-name [fps] [import]
  *          Set custom frames per second for the playing animation-name. Define import to use a Game Variable to grab the fps from
  * 
+ *      KunAnimations speed|variant [animation|alias] [variant]
+ *          Creates an additive variant percent value over the FPS and LOOP animation properties,
+ *          to cause a duration and speed random behaviour.
+ * 
+ *      KunAnimations playback [animation] [on|off]
+ *          Keep playing the animation once finished again and again, if this animation has a next animation list
+ * 
  *      KunAnimations pause animation-name
  *          Pause animation-name if playing
  * 
  *      KunAnimations resume animation-name
  *          Resume animation-name if paused
  * 
+ *      KunAnimations effects [alias:alias:...] [opacity] [blending] ...
+ * 
  *      KunAnimations target [random]
  *          Update to the next target in the list of touched spots
+ *          Tag random for random target selection inthe available state
  * 
- *      KunAnimations mode [capture|touch|disabled]
+ *      KunAnimations spot animation-name spot-name
+ *          Export the X and Y coordinates of the spot-name area if available in the current animation play
+ * 
+ *      KunAnimations repeat [animation|alias]
+ *          Repeats the last spot targeted
+ * 
+ *      KunAnimations mode [playback|capture|touch|disabled]
  *          Set the mouse interactive mode. Set touch to activate the interactive events. Set capture to describe hotspot areas in the console (requires debug mode on). Set disable to turn off the event listener.
  * 
  *      KunAnimations clear [targets | alias]
  *          Clear the current target queue
  *          Clear targets or defined aliases
  * 
- *      KunAnimations alias [alias_name] [animation_name]
+ *      KunAnimations alias [alias_name] [animation_name] [pictureId]
  *          Create an alias for a specific animation controller to ease picture swapping with the same tags
+ *          Use a pictureId to filter which animation picture is the alias for
  * 
- *      KunAnimations play [sound_bank_name] [wait_seconds] [random_elapsed_seconds]
- *          Play a sound bank selection by name
- *          Set wait seconds to include a time waiting pause before running the next events
- *          Add random elapsed seconds to define a randomized timespan
- * 
- *      KunAnimations interruption [on|off]
- *          Allow a sound bank selection to interrupt other Sound Effects playing by MEdia Player
- *          Activated by default for those sound banks marked with Allow SE interruption
+ *      KunAnimations load [profile:profile:profile] [id:x:y:sx:sy:opacity:blend:origin] [alias]
+ *          Prepare a staged scene and setup picture from an existing animation profile
+ *          Fill in all required setups with picture ID, position(x,y), scale(sx,sy), opacity, blending and origin
+ *          Override the profile alias if required
  * 
  *      KunAnimations wait [elapsed_seconds] [random_elapsed_seconds]
  *          Wait for elapsed seconds before running the next routines in the event editor
  *          Add random elapsed seconds to define a randomized timespan
  * 
+ *      KunAnimations prepare | complete
+ *          Resets all the active animations to prepare a new animation or close a running one.
  * 
- * HIERARCHY:
+ *      KunAnimations action [alias|picture] [action_tag]
  * 
- *  -> Scene
- *  ----> AnimationLayer
- *  --------> TouchSpot
+ *      KunAnimations playlist [alias|picture] [clear|animation1:animation2:animation3:...]
+ *          Create a playlist for a scene playback
+ *          Use alias and picturenames alike
+ *          Use clear command to remove a playlist
+ *          Define a list of animations separated by :
  * 
- *  - Animation Controllers
- *    defined by the Selected Picture File.
- *    Here you can setup the columns and rows, to properly display the frames.
+ *      KunAnimations playback [alias|picture]
+ *          Play an animation from the PlayBack manager
+ *          Define playback mode to let the Animation Controller get the animations from the user's playlist
  * 
- *  - Animation Frameset Groups
- *    A list of frames to play, with a custom FPS, behavior and looping iterations.
+ *      KunAnimations playspot [alias|picture]
+ *          Capture an interactive hotspot from the current playing animation of the given picture.
+ *          Captured spot will export the registered X and Y Game Variables.
  * 
- *  - Touch Spots
- *    Every frameset animates a list of frames, but you can define on these a list of specific spots
- *    to click and cause a reaction, update a Game Variable, play a custom sound effect,
- *    and change to another specific frameset.
+ *      KunAnimations playmap [alias|name]
+ *          Play the mapped animations in the list
+ * 
+ *      KunAnimations mapanimation [alias|name] [gamevar] [animation:animation:animation:...]
+ *          Bind a game variable to a playlist of framesets in an animation.
+ *          As the game variable updates, the animation will play the frameset index corresponding to the gamevar
+ *          Use playmap command to run the animation selected by gamevar
+ * 
+ *      KunAnimations tagspot [alias|name] [include|exclude|random|any:tag:tag:tag] [path:path:...] [speed] [label:...]
+ *          Tags a target and plays by tagged animations
+ *          Use include|exclude:random to scope on the tags or simply pick a random target from the list
+ *          Use path list to define a list of random paths to move if target not found
+ *          Use fallback labels to jump out when no target found
+ *          Use speed to adjust the fps speed PERCENT and wait time (fps x %)
+ * 
+ *      KunAnimations mapspot [alias|name] [include|exclude|random|any:tag:tag:tag] [path:path:...] [speed] [label:...]
+ *          Tags a target and plays a mapped animation
+ *          Use include|exclude:random to scope on the tags or simply pick a random target from the list
+ *          Use path list to define a list of random paths to move if target not found
+ *          Use fallback labels to jump out when no target found
+ *          Use speed to adjust the fps speed PERCENT and wait time (fps x %)
+ * 
+ *      KunAnimation isplaying [alias|name:animation:animation:...] [label:label:...] [label:label:...]
+ *          Jumps to a specific label if an animation is playing or playing some frameset in the list
+ *          Set a fallback label list if required when not matching
+ * 
+ *      KunAnimations stages [alias|picture] [stage:picture] [stage:picture] [stage:picture] [...]
+ *          Binds a list of stages to this picture to replace the current playing picture with a single command line
+ * 
+ *      KunAnimations stage [alias|picture] [stage]
+ *          Changes the current picture and animation to the defined stage
+ *          Picture ID and animation alias will be moved to the next stage picture
+ * 
+ *      KunAnimations position [x1:y1:x2:y2] [x1:y1:x2:y2] [x1:y1:x2:y2] ...
+ *          Set the TouchX and TouchY game variables with the coordinates providen
+ *          if more than one block, will random among them
+ *          set x1,y1 to the top-left, set x2,y2 to the top-right
+ *          set only x1,y1, to define the x,y righ away
+ * 
+ * 
+ *      KunAnimations spotmenu [animation|alias] [skip|random|first|last|cancel] [left|center|right] [window|dim|transparent]
+ *      KunAnimations animationmenu [animation|alias] [skip|random|first|last|cancel] [left|center|right] [window|dim|transparent]
+ *      KunAnimations stagemenu [animation|alias] [skip|random|first|last|cancel] [left|center|right] [window|dim|transparent]
+ * 
  * 
  * 
  * @param debug
@@ -88,45 +146,39 @@
  * @value 0
  * @default 0
  * 
- * @param defaultFPS
+ * @param accurateSpots
+ * @text Accurate Spots
+ * @desc Set targetting spot accurate, or leave it disabled to random spot area coordinates.
+ * @type boolean
+ * @default false
+ * 
+ * @param masterFPS
  * @text Master Frame Time
  * @desc default frame time
  * @type number
  * @min 1
  * @default 10
  * 
- * @param touchVarCounter
- * @text Touch Counter Variable
- * @desc This variable handles the counter of enqueued interactions performed by the player
+ * @param touchvar
+ * @text Touch Gauge Game Variable
+ * @desc Use this variable to count all spotted targets in a touch scene
  * @type variable
  * @min 0
  * @default 0
  * 
- * @param touchVarLimit
+ * @param limitvar
  * @parent touchVar
- * @text Touch Limit Variable
- * @desc How many interactions can be saved in the queue. Can be updated in game to increase the touch events.
+ * @text Touch Range Game Variable
+ * @desc Define how many targets can save in the target gauge
  * @type variable
  * @min 0
  * @default 0
  * 
  * @param touchMode
  * @parent touchVar
- * @text Touch Mode Switch
- * @desc Use it to keep control of the interactive mode in the event editor. Use KunAnimations mode touch | disable to change it.
+ * @text Target Flag
+ * @desc This switch shall be toggled if a target is fired from the KunTargets target list
  * @type switch
- * @default 0
- * 
- * @param touchX
- * @text Touch X Var
- * @type variable
- * @min 0
- * @default 0
- * 
- * @param touchY
- * @text Touch Y Var
- * @type variable
- * @min 0
  * @default 0
  * 
  * @param touchSfx
@@ -143,21 +195,35 @@
  * @require 1
  * @dir audio/se/
  * 
- * @param animPacks
- * @text Extended Animation Packs
- * @desc Requires KunAnimationPacks Plugin to extend the animation collections to import
- * @type number
- * @min 0
- * @default 0
+ * @param selectSfx
+ * @text Select SE
+ * @desc Define a wheel/select sound effect
+ * @type file
+ * @require 1
+ * @dir audio/se/
  * 
- * @param controllers
- * @type struct<Controller>[]
- * @text Animation Scenes
+ * @param labels
+ * @type string[]
+ * @text Labels
+ * @desc Assign labels to hotspot and animation names, displayable on command menus. Split with colon: value:label1:label2:...
+ * 
+ * @param scenes
+ * @type struct<Scene>[]
+ * @text Scenes
  * @desc Define the DataBase of Animation Scene Controllers (keep it clean and easy!!)
  * 
+ * @param controllers
+ * @type text
+ * @text Animation Scenes (OLD)
+ * @desc Move to Scenes
+ * 
+ * @param profiles
+ * @type struct<Profile>[]
+ * @text Profiles
+ * @desc Create scene packages associated with an alias to quickly arrange different stages
+ * 
  */
-/*~struct~Controller:
- *
+/*~struct~Scene:
  * @param source
  * @text Source Picture Pack
  * @desc Add one or more source pictures with the same frameset columns and rows, to use with the same animation rules. Duplicated pictures will be discarded.
@@ -186,38 +252,91 @@
  * @min 0
  * @default 0
  * 
- * @param framesets
- * @type struct<FrameSet>[]
- * @text Animation Layers
- * @desc Frameset Collection
+ * @param mode
+ * @text Animation Mode
+ * @desc Enable interactive or dynamic events for this scene
+ * @type select
+ * @option Default
+ * @value default
+ * @option Moving
+ * @value move
+ * @option Interactive
+ * @value touch
+ * @option Static (no animation)
+ * @value static
+ * @default default
  * 
- * @param hotspots
- * @type struct<HotSpot>[]
- * @text Event Hotspots
- * @desc Add the interactive spots here
+ * @param framesets
+ * @type struct<Animation>[]
+ * @text Animations
+ * @desc Animation Frameset Collection
  * @default []
  * 
- * @param soundBankPrefix
+ * @param hotspots
+ * @type struct<Spot>[]
+ * @text HotSpots
+ * @desc Add the interactive spots here
+ * 
+ * @param soundProfile
  * @type text[]
- * @text Sound Bank Prefix
- * @desc Add here the sound bank prefix for each picture souce when required
+ * @text Sound Set
+ * @desc Add here the sound set prefix for each picture/souce when required
+ * 
+ * @param soundBankPrefix
+ * @parent soundProfile
+ * @type text[]
+ * @text Sound Set (deprecated)
+ * @desc Backwards compatibility. Use soundProfile instead.
+ * 
+ * @param soundLoop
+ * @parent soundProfile
+ * @text Sound Loop
+ * @desc Play sound effects after N loops
+ * @type number
+ * @min 0
+ * @max 10
+ * @default 4
  * 
  */
-/*~struct~FrameSet:
+/*~struct~Picture:
+ * @param picture
+ * @text Picture
+ * @desc Select a base picture to create a scene. Match the spritesheet columns and rows with the scene.
+ * @type file
+ * @require 1
+ * @dir img/pictures/
  * 
+ * @param collections
+ * @text Collections
+ * @type text[]
+ * @desc Define which collections is this picture included in
+ * 
+ * @param sound
+ * @type text
+ * @text Sound Collection
+ * @desc Define a sound collection to play the animation sounds with
+ * 
+ * @param soundLoop
+ * @parent sound
+ * @text Sound Loops
+ * @desc Define how many loops are required to play a sound in the current scene
+ * @type number
+ * @default 4
+ */
+/*~struct~Animation:
  * @param name
  * @text Name
  * @type text
- * @default new-frameset
+ * @default animation
  * 
  * @param frames
- * @text FrameSet
+ * @text Frames
  * @type number[]
  * @min 0
  * @desc List of frames to play in this animation
+ * @default []
  * 
  * @param type
- * @parent frames
  * @text Animation Type
  * @type select
  * @option Forward (default)
@@ -231,7 +350,6 @@
  * @default forward
  * 
  * @param fps
- * @parent frames
  * @text Frames Per Second
  * @desc Default FPS for this frameset (leave to 0 to get master FPS as default)
  * @type number
@@ -239,15 +357,13 @@
  * @default 0
  * 
  * @param loops
- * @parent frames
  * @type number
  * @text Loops
  * @desc number of times the animation will play before switching to the next animation. Leave it to 0 for endless loops (no next animation)
  * @default 0
  * 
  * @param next
- * @parent frames
- * @text Next Layers
+ * @text Next FrameSets
  * @type text[]
  * @desc Define the next frameset to call. If more than one specified, they will be randomly called
  * 
@@ -261,147 +377,55 @@
  * @type number
  * @default 0
  * 
- * @param clearTargets
- * @type boolean
- * @text Clear Target Queue
- * @desc Clear all targets in the queue when loading this frameset layer
- * @default false
- * 
  * @param spots
- * @type struct<TouchSpot>[]
- * @text Touch Spots
+ * @type struct<Touch>[]
+ * @text Spots
  * @desc Interactive Spots to fire events
  * @default []
  * 
+ * @param conditions
+ * @type struct<Condition>[]
+ * @text Conditions
+ * @desc Enable this Animation when meeting these conditions
+ * 
+ * @param tags
+ * @text Tags
+ * @type text[]
+ * @desc Define tags to filter related animations
+ * 
  * @param bank
- * @text Sound Banks
- * @desc Play one of these sound banks each time this frameset is started. Requires KunSoundBanks.
+ * @text Sound Sets (deprecated)
+ * @desc Obsolete. Move to sounds instead
  * @type text[]
  * @default []
  * 
- * @param actions
- * @type struct<LayerAction>[]
- * @text Layer Actions
- * @desc Do this when running this layer
+ * @param sounds
+ * @text Sound Sets
+ * @desc Type in a defined sound bank name to play a special sound set each time this frameset is started.
+ * @type text[]
  * @default []
  * 
- * @param conditions
- * @type struct<LayerCondition>[]
- * @text Layer Conditions
- * @desc Run this layer when meeting these conditions
- * @default []
  */
-/*~struct~LayerAction:
- * @param once
- * @type boolean
- * @text Run Once
- * @desc Run this action just once in this Scene
- * @default false
- * 
- * @param var
- * @type variable
- * @text Game Variable
- * @desc define a game variable to update with this action
- * @min 0
- * @default 0
- * 
- * @param op
- * @text Operator
- * @desc Operation type to run on the Game Variable
- * @type select
- * @option Add
- * @value add
- * @option Sub
- * @value sub
- * @option Set
- * @value set
- * @default add
- * 
- * @param val
- * @text Value
- * @desc Value to update the game variable with
- * @type number
- * @min 0
- * @default 0
- * 
- * @param swon
- * @type switch[]
- * @text Game Switch On
- * @desc define a list of game switches to activate when running this animation layer
- * @min 0
- * @default []
- * 
- * @param swoff
- * @type switch[]
- * @text Game Switch Off
- * @desc define a list of game switches to disable when running this animation layer
- * @min 0
- * @default []
- */
-/*~struct~LayerCondition:
- * @param var
- * @type variable
- * @text Game Variable
- * @desc define a game variable to check for this condition
- * @min 0
- * @default 0
- * 
- * @param op
- * @text Operator
- * @desc Select the type of operation to cast over the value for this Game Variable
- * @type select
- * @option Greater
- * @value greater
- * @option Greater or equal
- * @value greater_equal
- * @option Equal
- * @value equal
- * @option Less or equal
- * @value less_equal
- * @option Less
- * @value less
- * 
- * @param val
- * @type number
- * @text Value Range
- * @desc Operate with this value
- * @min 0
- * @default 0
- */
-/*~struct~TouchSpot:
+/*~struct~Touch:
  * 
  * @param name
  * @text Name
- * @desc Define here a touch event when hitting a specific area.
  * @type text
- * @default touch-me-here
- * 
- * @param trigger
- * @text On Click
- * @type select
- * @option Instant Run
- * @value instant
- * @option Queue
- * @value queue
- * @option Next Frame
- * @value frame
- * @option Ignore
- * @value ignore
- * @default queue
+ * @default touch
  * 
  * @param next
- * @text Switch Frameset
+ * @text Next Animation
  * @desc Jump to Frameset on touched (allow mrandom options when more than 1)
  * @type text[]
  * @default []
  * 
  */
-/*~struct~HotSpot:
+/*~struct~Spot:
  * 
  * @param name
  * @text Name
  * @type text
- * @default touch-me-here
+ * @default touch
  * 
  * @param x1
  * @text X1
@@ -427,6 +451,21 @@
  * @min 0
  * @desc Y destination coordinate
  * 
+ * @param trigger
+ * @text On Click
+ * @type select
+ * @option Instant Run
+ * @value instant
+ * @option Queue
+ * @value queue
+ * @option Set Frame
+ * @value frame
+ * @option Next Frame
+ * @value next
+ * @option Ignore
+ * @value ignore
+ * @default queue
+ * 
  * @param sfx
  * @text Touch Audio SFX
  * @desc Define a specific sound effect
@@ -434,17 +473,27 @@
  * @require 1
  * @dir audio/se/
  * 
+ * @param tags
+ * @type text[]
+ * @name Tags
+ * @desc add tags to categorize the spot selection
+ * 
+ * @param conditions
+ * @type struct<Condition>[]
+ * @text Conditions
+ * @desc Enable this HotSpot when meeting these conditions
+ * 
  * @param varId
  * @text Game Variable ID
  * @type variable
  * @min 0
- * @desc Game Variable Mutator. Leave to 0 to not update variables.
+ * @desc (Obsolete) Game Variable Mutator. Leave to 0 to not update variables. Use Actions instead.
  * @default 0
  * 
  * @param behavior
  * @parent varId
  * @text Update Behavior
- * @desc How to modify the value on Game Variable ID
+ * @desc (Obsolete) How to modify the value on Game Variable ID. Use Actions instead
  * @type select
  * @option Add (default)
  * @value add
@@ -452,1592 +501,2748 @@
  * @value sub
  * @option Set
  * @value set
- * @option Set Frame
- * @value frame
- * @option Ignore
- * @value ignore
  * @default add
  * 
  * @param amount
  * @parent varId
  * @text Update Amount
+ * @desc (Obsolete) Use Actions instead
  * @type number
  * @min 1
  * @default 1
+ * 
  */
-
-
-//const { count } = require('console');
-
-/**
- * @description KUN Modules
- * @type KUN
+/*~struct~Action:
+ * @param tag
+ * @text Tag
+ * @type text
+ * @desc Set a tag for this action used for a filtered action selection
+ * 
+ * @param var
+ * @type variable
+ * @text Game Variable
+ * @desc define a game variable to update with this action
+ * @min 0
+ * @default 0
+ * 
+ * @param op
+ * @text Operator
+ * @desc Operation type to run on the Game Variable
+ * @type select
+ * @option Add
+ * @value add
+ * @option Sub
+ * @value sub
+ * @option Set
+ * @value set
+ * @default set
+ * 
+ * @param val
+ * @text Value
+ * @desc Value to update the game variable with
+ * @type number
+ * @min 0
+ * 
  */
-//var KUN = KUN || {};
+/*~struct~Condition:
+ *
+ * @param var
+ * @type variable
+ * @text Game Variable
+ * @desc define a game variable to check for this condition
+ * @min 0
+ * @default 0
+ * 
+ * @param op
+ * @text Operator
+ * @desc Select the type of operation to cast over the value for this Game Variable
+ * @type select
+ * @option Greater
+ * @value greater
+ * @option Greater or equal
+ * @value greater_equal
+ * @option Equal
+ * @value equal
+ * @option Less or equal
+ * @value less_equal
+ * @option Less
+ * @value less
+ * @default equal
+ * 
+ * @param val
+ * @type number
+ * @text Value
+ * @desc Operate with this value
+ * @min 0
+ * @default 0
+ * 
+ * @param target
+ * @type boolean
+ * @text Value as Variable
+ * @desc Map value as a Game Variable which provides the real value. Value must be a valid Game Variable.
+ * @default false
+ * 
+ * @param on
+ * @type switch[]
+ * @text Game Switch ON
+ * @desc define which game switches must be ON for this condition
+ *
+ * @param off
+ * @type switch[]
+ * @text Game Switch OFF
+ * @desc define which game switches must be OFF for this condition
+ *
+ */
+/*~struct~Profile:
+ * @param profile
+ * @type text
+ * @desc Profile name
+ * @default profile
+ * 
+ * @param start
+ * @type text
+ * @text Starting frame
+ * @desc Define the starting frameset for this animation group
+ * 
+ * @param pictures
+ * @text picture stages to run within this profile
+ * @type file[]
+ * @require 1
+ * @dir img/pictures/
+ */
 
 /**
  * 
- * @returns 
  */
-function KunSceneManager() {
-    throw `${this.constructor.name} is a Static Class`;
-}
-/**
- * 
- * @returns KunSceneManager
- */
-KunSceneManager.Initialize = function(){
-
-    var parameters = this.PluginParameters()
-
-    this._debug = parseInt( parameters.debug || KunSceneManager.DebugMode().Disabled );
-    this._fps = parseInt(parameters.defaultFPS );
-    this._touchVar = parseInt(parameters.touchVarCounter || 0 );
-    this._limitVar = parseInt(parameters.touchVarLimit || 0 );
-    this._touchMode = parseInt(parameters.touchMode || 0 );
-
-    this._varX = parseInt(parameters.touchX || 0 );
-    this._varY = parseInt(parameters.touchY || 0 );
-    this._sfx = {
-        'touch': parameters.touchSfx || '',
-        'cancel': parameters.cancelSfx || '',
-    };
-
-
-    this._mode = KunSceneManager.Mode().Disabled;
-    this._soundBanks = {};
-    this._scenes = {};
-    //this._overrides = {};
-    this._alias = {};
-    this._targets = [];
-
-    this._breakInterrupt = false;
-    this._animationPacks = parseInt(parameters.animPacks || 0);
-
-    var framesets = parameters.controllers.length > 0 ? JSON.parse(parameters.controllers ) : [];
-    //var banks = parameters.soundBank.length > 0 ? JSON.parse(parameters.soundBank) : [];
-
-    return this.ImportScenes( framesets );
-};
-/**
- * @returns Object
- */
-KunSceneManager.DebugMode = function(){
-    return {
-        'Disabled':0,
-        'Enabled': 1,
-        'TraceLog': 2,
-    };
-};
-/**
- * 
- * @param {Boolean} stop 
- */
-KunSceneManager.stopInterruption = function( stop ){
-    this._breakInterrupt = typeof stop === 'boolean' && stop;
-    return this.canInterrupt();
-};
-/**
- * @returns Number
- */
-KunSceneManager.animationPacks = function(){
-    return this._animationPacks;
-};
-/**
- * @returns Boolean
- */
-KunSceneManager.canInterrupt = function(){
-    return !this._breakInterrupt;
-};
+class KunScenes {
     /**
-     * @returns Boolean
+     * @returns {KunScenes}
      */
-    KunSceneManager.debug = function( level ){
-        if( typeof level === 'number' && level > 0 ){
-            return this._debug >= level;
+    constructor() {
+        if (KunScenes.__instance) {
+            return KunScenes.__instance;
         }
-        return this._debug > KunSceneManager.DebugMode().Disabled;
+
+        KunScenes.__instance = this;
+
+        this.initialize();
+    }
+    /**
+     * 
+     */
+    initialize() {
+
+        const _parameters = KunSceneImporter.PluginData();
+        const _importer = new KunSceneImporter();
+
+        this._debug = _parameters.debug;
+        this._fps = _parameters.defaultFPS || 10;
+        //this._touchVar = _parameters.touchVarCounter;
+        //this._limitVar = _parameters.touchVarLimit;
+        //this._targetFlag = _parameters.touchMode;
+        this._accurate = _parameters.accurateSpots;
+        //added as new version to implement external plugin animation packs avoiding overloading the KunAnimationPacks plugin
+
+        //this._varX = _parameters.touchX || 0;
+        //this._varY = _parameters.touchY || 0;
+        this._varwheel = _parameters.wheel || 0;
+        this._sfx = {
+            'touch': _parameters.touchSfx || '',
+            'cancel': _parameters.cancelSfx || '',
+            'select': _parameters.selectSfx || '',
+        };
+
+        this._mode = KunAnimation.Mode.Disabled;
+        this._scenes = _importer.importScenes(_parameters.scenes || []);
+        this._collections = _importer.importCollections(_parameters.profiles);
+        this._labels = _importer.importLabels(_parameters.labels || []);
+
+        this._targets = new KunTargets(_parameters.touchvar, _parameters.limitvar);
+        this._player = new KunScenePlayer();
+    }
+
+    /**
+     * @returns {KunScenePlayer}
+     */
+    player() { return this._player; }
+    /**
+     * @returns {KunTargets}
+     */
+    targets() { return this._targets; }
+    /**
+     * @param {Boolean} list 
+     * @returns {Object|String[]}
+     */
+    labels(list = false) { return list ? Object.values(this._labels) : this._labels; };
+
+
+    /**
+     * @returns {Boolean}
+     */
+    debug(level = KunScenes.DebugMode.Disabled) {
+        return level ? this._debug >= level : this._debug > KunScenes.DebugMode.Disabled;
     };
     /**
-     * @param {String} bank 
+     * @param {String} sound 
      * @param {Number} round
-     * @returns KunSceneManager
+     * @returns {KunScenes}
      */
-    KunSceneManager.playBank = function( bank , round ){
-        if( typeof KunSoundBanks === 'function' ){
-            //KunSceneManager.DebugLog( `Playing Sound Bank: ${bank}` );
-            KunSoundBanks.play( bank , round );
+    playSound(sound = '') {
+        if (sound && KunSounds && typeof KunSounds.play === 'function') {
+            KunSounds.play(sound);
         }
         return this;
     };
     /**
-     * @param {String} bank 
-     * @returns KunSoundBank
+     * @param {KunAnimation.Mode|String} mode 
+     * @returns {KunScenes}
      */
-    KunSceneManager.soundBank = function( bank ){
-        return ( typeof KunSoundBanks === 'function' ) ? KunSoundBanks.get( bank ) : null;
-    };
-    /**
-     * 
-     * @param {String} alias 
-     * @param {String} original 
-     * @returns KunSceneManager
-     */
-    KunSceneManager.setAlias = function( alias , original ){
-        this._alias[alias] = original;
-        return this;
-    };
-    /**
-     * @param {String} alias 
-     * @returns String
-     */
-    KunSceneManager.getAlias = function( alias ){
-        return this._alias.hasOwnProperty(alias) ? this._alias[alias] : alias;
-    }
-    /**
-     * 
-     * @returns KunSceneManager
-     */
-    KunSceneManager.clearAlias = function(){
-        this._alias = {};
-        return this;
-    };
-    /**
-     * @param {String} mode 
-     * @returns KunSceneManager
-     */
-    KunSceneManager.setMode = function( mode ){
+    setMode(mode = KunAnimation.Mode.Disabled) {
         this._mode = mode;
-        switch( this._mode ){
-            case KunSceneManager.Mode().Capture:
-            case KunSceneManager.Mode().Touch:
-                this.unlock(true);
+        const targets = this.targets();
+        switch (this._mode) {
+            case KunAnimation.Mode.Capture:
+            case KunAnimation.Mode.Touch:
+                targets.lock(false);
                 break;
-            case KunSceneManager.Mode().Disabled:
+            case KunAnimation.Mode.Disabled:
             default:
-                this.clearTargets().lock();
+                targets.clear().lock(true);
+                //this.clearTargets().lock();
                 break;
         }
         return this;
     };
     /**
-     * @returns Object
+     * @returns {String}
      */
-    KunSceneManager.dump = function(){
+    sfx(name = 'touch') {
+        return name.length && this._sfx.hasOwnProperty(name) ? this._sfx[name] : this._sfx.touch;
+    };
+    /**
+     * @returns {Boolean}
+     */
+    accurateSpots() { return this._accurate; }
+    /**
+     * @returns {Boolean}
+     */
+    locked() { return this._mode === KunAnimation.Mode.Disabled; };
+    /**
+     * Required for clear chaining. Do not remove atm
+     * @returns {KunScenes}
+     */
+    clearTargets() {
+        this.targets().clear();
         return this;
-    }
-    /**
-     * @returns String
-     */
-    KunSceneManager.sfx = function( name ){
-        return typeof name === 'string' && name.length && this._sfx.hasOwnProperty(name) ? this._sfx[name] : this._sfx.touch;
     };
     /**
-     * @returns Number
+     * @param {Number} x 
+     * @param {Number} y 
+     * @returns {KunScenes}
      */
-    KunSceneManager.limit = function(){
-        return this._limitVar > 0 ? $gameVariables.value( this._limitVar ) : 1;
-    };
-    /**
-     * @param {Boolean} unlock
-     * @returns KunSceneManager
-     */
-    KunSceneManager.unlock = function( unlock ){
-        if( this._touchMode ){
-            $gameSwitches.setValue( this._touchMode, typeof unlock === 'boolean' && unlock );
+    /*setPosition(x = 0, y = 0) {
+        if (this._varX > 0) {
+            $gameVariables.setValue(this._varX, x);
+        }
+        if (this._varY > 0) {
+            $gameVariables.setValue(this._varY, y);
         }
         return this;
-    };
+    };*/
     /**
-     * @returns KunSceneManager
+     * @returns {Object} {x,y}
      */
-    KunSceneManager.lock = function( ){
-        return this.unlock(false);
-    };
-    /**
-     * @returns Boolean
-     */
-    KunSceneManager.locked = function(){
-        return this._mode === KunSceneManager.Mode().Disabled;
-        return this._touchMode > 0 && !$gameSwitches.value(this._touchMode);
-    };
+    /*position() {
+        return {
+            'x': this._varX && $gameVariables.value(this._varX) || 0,
+            'y': this._varY && $gameVariables.value(this._varY) || 0,
+        };
+    };*/
     /**
      * @param {String} name 
-     * @returns Object {X,Y}
-     */
-    KunSceneManager.offset = function( name ){
-        var picture = this.get(name);
-        if( picture !== null ){
-            var layer = picture.current();
-            if( layer !== null ){
-                return {
-                    'x':layer.offsetX(),
-                    'y':layer.offsetY()
-                };
-            }
-        }
-        return {'x':0,'y':0};
-    };
-    /**
-     * @param {String} picture
-     * @param {String} spot
      * @param {Number} x 
      * @param {Number} y 
-     * @returns Boolean
+     * @returns {Object} {x,y}
      */
-    KunSceneManager.enqueue = function( picture , spot , x , y ){
-        if( this.targets().length < this.limit() ){
-            this.targets().push({
-                'scene':picture,
-                'spot': spot,
-                'x':x,
-                'y':y,
-            });
-            this.updateTouchPoints( this.countTargets()).playFx();
-            return true;
+    picturePosition(name, x = 0, y = 0) {
+        const pictures = name && $gameScreen._pictures.filter(picture => picture && picture._name === name) || [];
+        const position = { x: 0, y: 0, };
+        if (pictures.length) {
+            position.x = pictures[0]._x + Math.floor(pictures[0]._scaleX / 100 * x);
+            position.y = pictures[0]._y + Math.floor(pictures[0]._scaleY / 100 * y);
         }
-        else{
-            KunSceneManager.PlayFX(this.sfx('cancel'));
+        return position;
+    };
+    /**
+     * @param {Number} value 
+     * @returns {KunScenes}
+     */
+    scroll(value = 0) {
+        if (Math.abs(value) && this._varwheel) {
+            const min = 0;
+            const max = 8;
+            const amount = Math.max(($gameVariables.value(this._varwheel) + value / Math.abs(value)) % max, min);
+            $gameVariables.setValue(this._varwheel, amount);
+            //console.log($gameVariables.value(this._varWheel));
         }
-        return false;
-    };
-    /**
-     * @returns Array
-     */
-    KunSceneManager.targets = function(){
-        return this._targets;
-    };
-    /**
-     * @returns Number
-     */
-    KunSceneManager.countTargets = function(){
-        return this._targets.length;
-    }
-    /**
-     * 
-     * @returns KunSceneManager
-     */
-    KunSceneManager.clearTargets = function(){
-        this._targets = [];
-        return this.updateTouchPoints();
-    };
-    /**
-     * @param {Boolean} random 
-     * @returns Object
-     */
-    KunSceneManager.nextSpot = function( random ){
-        var spot = typeof random === 'boolean' && random && this.countTargets() > 1 ?
-            this.targets().splice( Math.floor(Math.random() * this.countTargets( ) ), 1) :
-            this.targets().shift();
-        return Array.isArray(spot) ? spot[0] : spot;
-    };
-    /**
-     * @param {Boolean} random
-     * @returns KunSceneManager
-     */
-    KunSceneManager.target = function( random ){
-        if(this.countTargets()){
-            var touch = this.nextSpot( random );
-            //console.log(spot);
-            var scene = this.get(touch.scene);
-            if( scene !== null ){
-                var fs = scene.current();
-                if( fs !== null ){
-                        var target = fs.getSpot(touch.spot);
-                        if( target !== null ){
-                            target.update();
-                            //export X and Y positions
-                            this.exportPosition( touch.x , touch.y );
-                            //jump to next frameset (if any)
-                            scene.changeLayer( scene.selectLayer( target.nextLayers() , true ) , true );
-                            //this.selectLayer( this.current().next() , true )
-                            //scene.changeLayer( target.next() , true );
-                        }
-                }
-                else{
-                    KunSceneManager.DebugLog(`Invalid FrameSet ${touch.spot}`);    
-                }
-            }
-            else{
-                KunSceneManager.DebugLog(`Invalid Controller ${touch.scene}`);
-            }
-        }    
-        return this.updateTouchPoints(this.countTargets());
-    };
-    /**
-     * @param {String} picture 
-     * @returns KunSceneManager
-     */
-    KunSceneManager.randomTarget = function( picture ){
-        var scene = this.get(picture);
-        if( scene !== null ){
-            var layer = scene.current();
-            if( layer !== null ){
-                var spot = layer.randomSpot();
-                if( spot !== null ){
-                    var pos = spot.generatePosition( );
-                    this.exportPosition( pos.x , pos.y );
-                }
-            }
-        }
-        return this;
-    };
-    /**
-     * @param {Number} x 
-     * @param {Number} y 
-     * @returns KunSceneManager
-     */
-    KunSceneManager.exportPosition = function( x  , y ){
-        if( this._varX > 0 ){
-            $gameVariables.setValue(this._varX,x);
-        }
-        if( this._varY > 0 ){
-            $gameVariables.setValue(this._varY,y);
-        }
-        //KunSceneManager.DebugLog(`Event Clicked on ${x},${y}`);
         return this;
     };
     /**
      * @param {Number} counter 
-     * @returns KunSceneManager
+     * @returns {KunScenes}
      */
-    KunSceneManager.updateTouchPoints = function( counter ){
-        if( this._touchVar > 0 ){
-            $gameVariables.setValue(this._touchVar , counter  || 0 );
+    updateTouchPoints(counter = 0) {
+        if (this._touchVar > 0) {
+            $gameVariables.setValue(this._touchVar, counter);
         }
         return this;
     };
     /**
-     * @returns Boolean
+     * @param {Boolean} gameVar
+     * @returns {Number}
      */
-    KunSceneManager.canCapture = function(){
-        return this._mode === KunSceneManager.Mode().Capture;
+    touchLimit(gameVar = false) {
+        return gameVar ? this._limitVar : this._limitVar && $gameVariables.value(this._limitVar) || 1;
     };
     /**
-     * @returns Boolean
+     * @returns {Boolean}
      */
-    KunSceneManager.canTouch = function(){
-        return this._mode === KunSceneManager.Mode().Touch && !this.locked();
+    canCapture() {
+        return this.mode() === KunAnimation.Mode.Capture;
     };
     /**
-     * @returns String
+     * @returns {Boolean}
      */
-    KunSceneManager.mode = function(){
-        return this._mode;
+    canTouch() {
+        return this.mode() === KunAnimation.Mode.Touch && !this.locked();
     };
     /**
-     * @returns Number
+     * @returns {Boolean}
      */
-    KunSceneManager.defaultFps = function(){
-        return this._fps;
+    canWheel() {
+        return this.mode() === KunAnimation.Mode.Touch && this._varwheel > 0;
     };
     /**
-     * @returns Array | Object
+     * @returns {Boolean}
      */
-    KunSceneManager.scenes = function( list ){
-        return typeof list === 'boolean' && list ? Object.values(this._scenes) : this._scenes;
+    canPlayBack() {
+        return this.mode() === KunAnimation.Mode.PlayBack;
     };
     /**
-     * @returns Array
+     * @returns {String}
      */
-    KunSceneManager.list = function( ){
-        return Object.keys( this._scenes );
-    };
+    mode() { return this._mode; };
     /**
-     * @param {KunAnimationScene} controller 
-     * @returns KunSceneManager
+     * @returns {Number}
      */
-    KunSceneManager.addScene = function( controller ){
-        if( controller instanceof KunAnimationScene && !this.has(controller.name()) ){
-            this._scenes[controller.name()] = controller;
-        }
-        return this;
+    FPS() { return this._fps || 20; };
+    /**
+     * @param {Boolean} mapname
+     * @returns {KunScene[],String[]}
+     */
+    scenes(mapname = false) {
+        return mapname && this._scenes.map(scn => scn.name()) || this._scenes;
+        //return mapname ? Object.values(this._scenes) : this._scenes;
     };
     /**
      * @param {String} name 
-     * @returns Boolean
+     * @returns {KunScene}
      */
-    KunSceneManager.has = function( name ){
-        return this._scenes.hasOwnProperty( name );
-    }
+    scene(name = '') { return name && this.scenes().find(scn => scn.name() === name) || null; }
     /**
      * @param {String} name 
-     * @returns Boolean
+     * @returns {Boolean}
      */
-    KunSceneManager.isPlaying = function( name ){
-        return this.has( name ) && this.get( name ).playing();
-    };
+    has(name = '') { return name && this.scenes(true).includes(name); }
     /**
-     * @returns Array
+     * @param {String} sfx
+     * @param {Number} pitch
+     * @param {Number} pan
+     * @returns {KunScenes}
      */
-    KunSceneManager.controllers = function( list ){
-        return typeof list === 'boolean' && list ? Object.values( this._scenes ) : this._scenes;
-    };
-    /**
-     * @param {String} pictureName 
-     * @returns {KunAnimationScene}
-     */
-    KunSceneManager.get = function( pictureName ){
-        return this.has( pictureName ) ? this._scenes[pictureName] : null;
-    }
-    /**
-     * @param {String} pictureName 
-     * @returns {KunAnimationScene}
-     */
-    KunSceneManager.scene = function( pictureName ){
-        return this.has( pictureName ) ? this._scenes[pictureName] : KunAnimationScene.INVALID;
-    }
-    /**
-     * @param {String} pictureName 
-     * @returns {KunSceneManager}
-     */
-    KunSceneManager.stop = function( pictureName ){
-        return this;
-    };
-    /**
-     * @param {String} picturename 
-     * @param {Boolean} replay
-     * @returns KunSceneManager
-     */
-    KunSceneManager.reset = function( picturename , replay  ){
-        if( this.has( picturename)){
-            this.get(picturename).first().reset( typeof replay === 'boolean' && replay );
+    playse(sfx, pitch, pan) {
+        if (sfx.length) {
+            if (typeof pitch !== 'number') {
+                pitch = 90 + Math.floor(Math.random() * 20);
+            }
+            if (typeof pan !== 'number') {
+                pan = Math.floor(Math.random() * 20) - 10;
+            }
+            KunScenes.AudioManager(sfx, 100, pitch, pan);
         }
         return this;
+    };
+    /**
+     * @param {Number} pictureId 
+     * @param {String} name 
+     * @param {Number} x 
+     * @param {Number} y 
+     * @param {Number} scaleX 
+     * @param {Number} scaleY 
+     * @param {Number} opacity 
+     * @param {Number} blend 
+     * @param {Number} origin
+     * @returns {Game_Picture}
+     */
+    /*preparePicture(name = '', pictureId = 0, x = 0, y = 0, scaleX = 100, scaleY = 100, opacity = 255, blend = 0, origin = 0) {
+        if (name && pictureId) {
+            $gameScreen.showPicture(
+                pictureId, name,
+                origin || 0, // origin (top-left)
+                x, y,
+                scaleX, scaleY,
+                opacity, blend);
+
+            return $gameScreen.picture(pictureId);
+        }
+
+        return null;
+    };*/
+    /**
+     * @param {Number} pictureId 
+     * @param {String} pictureName 
+     * @returns {Game_Picture}
+     */
+    /*replacePicture(pictureId = 0, pictureName = '') {
+        if (pictureName && pictureId) {
+
+            const original = $gameScreen.picture(pictureId);
+            if (original) {
+
+                return this.preparePicture(pictureName, pictureId,
+                    original.x(), original.y(),
+                    original.scaleX(), original.scaleY(),
+                    original.opacity(), original.blendMode(),
+                    original.origin());
+            }
+
+        }
+        return null;
+    };*/
+    /**
+     * @returns {KunSceneCollection[]}
+     */
+    collections() { return this._collections; }
+
+    /**
+     * @param {String} se 
+     * @param {Number} volume 
+     * @param {Number} pitch 
+     * @param {Number} pan 
+     * @param {Boolean} interrupt
+     */
+    static AudioManager(se = '', volume = 90, pitch = 100, pan = 0, interrupt = false) {
+        if (se.length) {
+            if (interrupt) {
+                AudioManager.stopSe();
+            }
+            //KunScenes.DebugLog( `Playing ${se} at vol ${volume}, pitch ${pitch} and pan ${pan} ${interrupt}` );
+            AudioManager.playSe({ name: se, pan: pan || 0, pitch: pitch || 100, volume: volume || 90 });
+        }
+    };
+    /**
+     * @param {String} message 
+     */
+    static DebugLog() {
+        if (KunScenes.manager().debug()) {
+            console.log('[ KunScenes ]', ...arguments);
+        }
+    };
+
+    /**
+     * @param {String}
+     * @returns {Boolean}
+     */
+    static command(command = '') {
+        return ['kunanimations', 'kunanimation'].includes(command.toLowerCase());
+    };
+    /**
+     * @returns {KunScenes}
+     */
+    static manager() { return KunScenes.__instance || new KunScenes(); }
+}
+
+
+/**
+ * @returns {KunScenes.DebugMode|Number}
+ */
+KunScenes.DebugMode = { Disabled: 0, Enabled: 1, TraceLog: 2, };
+
+
+/**
+ * Content Importer
+ */
+class KunSceneImporter {
+
+    constructor() {
+        //this._scenes = 0;
+        //this._pictures = 0;
+        this._animations = 0;
+        this._hotspots = 0;
+        this._actions = 0;
+        this._conditions = 0;
+
+        this._scenes = [];
+        this._collections = [];
     }
     /**
-     * @param {String} pictureName 
-     * @returns {KunSceneManager}
+     * 
+     * @returns {KunSceneImporter}
      */
-    KunSceneManager.resume = function( pictureName ){
+    summary() {
+        //leave this here for debugging.
+        if (KunScenes.manager().debug(KunScenes.DebugMode.TraceLog)) {
+            KunScenes.DebugLog(`Imported a total of ${this.scenes().length} animated scenes, ${this._animations} animation layers and ${this._hotspots} hotspots`);
+            KunScenes.DebugLog(`Imported a total of ${this._actions} actions and  ${this._conditions} conditions`);
+            KunScenes.DebugLog(`Imported a total of ${this._collections.length} Collections`);
+        }
         return this;
     };
 
     /**
-     * @param {String} pictureName 
-     * @param {String} layerName 
-     * @returns {KunSceneManager}
+     * @returns {KunScene[]}
      */
-    KunSceneManager.overrideSet = function( pictureName , layerName ){
-        if( this.isPlaying( pictureName)){
-            this._scenes[ pictureName ].changeLayer(layerName, true ) ;
-            if( KunSceneManager.debug( KunSceneManager.DebugMode().TraceLog ) ){
-                KunSceneManager.DebugLog(`Playing ${pictureName}.${layerName}`);
-            }    
-            this.updateTouchPoints(this.countTargets());
-        }
-        else if(KunSceneManager.debug( )){
-            KunSceneManager.DebugLog(`${pictureName}.${layerName} is not playing in the current scene`);
+    scenes() { return this._scenes; }
+    /**
+     * @returns {KunSceneCollection[]}
+     */
+    collections() { return this._collections; }
+
+    /**
+     * @param {String} picture 
+     * @returns {Boolean}
+     */
+    has(picture = '') {
+        return picture && this.scenes().find(scn => scn.name() === picture) || null;
+    }
+    /**
+     * @param {KunScene} scene 
+     * @returns {KunScenes}
+     */
+    add(scene = null) {
+        if (scene instanceof KunScene && !this.has(scene.name())) {
+            this.scenes().push(scene);
         }
         return this;
+    };
+
+    /**
+     * @param {String[]} input 
+     * @returns {Object}
+     */
+    importLabels(input = []) {
+        const _labels = {};
+        input.map(tag => tag.trim().split(':'))
+            .filter(tag => tag.length)
+            .forEach(tag => _labels[tag[0]] = tag.slice(1).join('|'));
+        return _labels;
+    }
+    /**
+     * @param {Object[]} data 
+     * @returns {KunScene[]}
+     */
+    importScenes(data = []) {
+        data.forEach(content => {
+            if (!!content.picturegroup) {
+                //picturegroup are same as groups, but now include collections, instead of a group name
+                this.loadSceneV5(content);
+            }
+            else if (!!content.groups) {
+                //pictures are grouped by named groups, to ease the stage setup
+                this.loadSceneV4(content);
+            }
+            else if (!!content.pictures) {
+                //load new version 3: picture data is packed and can define animation groups. Picture scenes can be customized individually
+                this.loadSceneV3(content);
+            }
+            else if (!!content.source) {
+                //load version 2: picturedata iis just a list of pictures, profiles and audiopacks must be attached.
+                this.loadSceneV2(content);
+            }
+        });
+        //return all saved scenes
+        return this.scenes();
+    }
+    /**
+     * @param {Object} data 
+     * @returns {KunScene[]}
+     */
+    loadSceneV2(data = null) {
+        if (data instanceof Object) {
+            const pictures = Array.isArray(data.source) ? data.source : [];
+            const soundLoop = data.soundLoop || 0;
+            //sbprefix comes from older versions
+            const audiopack = data.soundProfile || data.soundBankPrefix || [];
+            const animdata = Array.isArray(data.framesets) && data.framesets || [];
+            const actiondata = Array.isArray(data.actions) && data.actions || [];
+            const spots = {};
+            const spotdata = (Array.isArray(data.hotspots) ? data.hotspots : []);
+            //import all scene defined hotspots
+            spotdata.filter(spot => !spots[spot.name]).forEach(spot => spots[spot.name] = spot);
+            //register a Scene Controller on every picture loaded in the list
+            pictures.map((content, index) => {
+                const soundpack = audiopack[audiopack.length > index && index || 0] || '';
+                return this.createPictureV2(data, content, soundpack, soundLoop);
+            }).forEach(scene => {
+                animdata.forEach(content => scene.add(this.importAnimation(content, spots)));
+                actiondata.forEach(content => scene.addAction(KunSceneImporter.importAction(content)));
+                this.add(scene)
+            });
+        }
+    };
+    /**
+     * @param {Object} data
+     * @param {String} picture
+     * @param {String} audiopack
+     * @param {Number} soundLoop
+     * @returns {KunScene}
+     */
+    createPictureV2(data, picture, audiopack = '', soundLoop = 0) {
+        return new KunScene(
+            picture,
+            data.cols, data.rows, data.fps || 0,
+            audiopack, soundLoop,
+            data.mode || '',
+        );
+    };
+    /**
+     * @param {Object} data 
+     * @returns {KunScene[]}
+     */
+    loadSceneV5(data = null) {
+        if (data instanceof Object) {
+            const spots = {};
+            const spotdata = Array.isArray(data.hotspots) ? data.hotspots : [];
+            const animations = Array.isArray(data.framesets) && data.framesets || [];
+            const actions = Array.isArray(data.actions) && data.action || [];
+            const picturegroup = Array.isArray(data.picturegroup) && data.picturegroup || []
+            //import all scene defined hotspots
+            spotdata.filter(spot => !spots[spot.name]).forEach(spot => spots[spot.name] = spot);
+            picturegroup.forEach(content => {
+                //run on every picture defined in the group
+                (content.pictures || []).forEach(picture => {
+                    //hook here the new group setup
+                    (content.collections || []).forEach( collection => this.addToCollection(collection,picture));
+                    //then create the spritesheet data
+                    const scene = new KunScene(picture,
+                        data.cols || 1, data.rows || 1, data.fps || 0,
+                        content.sound || '', content.loop || 0, data.mode || '',
+                    );
+                    animations.forEach(content => scene.add(this.importAnimation(content, spots)));
+                    actions.forEach(content => scene.addAction(this.importAction(content)));
+                    this.add(scene);
+                });
+            });
+        }
+    }
+    /**
+     * @param {Object} data 
+     * @returns {KunScene[]}
+     */
+    loadSceneV4(data = null) {
+        if (data instanceof Object) {
+            const spots = {};
+            const spotdata = Array.isArray(data.hotspots) ? data.hotspots : [];
+            const animations = Array.isArray(data.framesets) && data.framesets || [];
+            const actions = Array.isArray(data.actions) && data.action || [];
+            const groups = Array.isArray(data.groups) && data.groups || []
+            const scenes = [];
+            //import all scene defined hotspots
+            spotdata.filter(spot => !spots[spot.name]).forEach(spot => spots[spot.name] = spot);
+            groups.forEach(content => {
+                //run on every picture defined in the group
+                (content.pictures || []).forEach(picture => {
+                    //hook here the new group setup
+                    content.group && this.addToCollection(content.group, picture);
+                    //then create the spritesheet data
+                    const scene = new KunScene(picture,
+                        data.cols || 1, data.rows || 1, data.fps || 0,
+                        content.sound || '', content.loop || 0, data.mode || '',
+                    );
+                    animations.forEach(content => scene.add(this.importAnimation(content, spots)));
+                    actions.forEach(content => scene.addAction(this.importAction(content)));
+                    this.add(scene);
+                });
+            });
+        }
+    }
+    /**
+     * @param {Object} data 
+     * @returns {KunScene[]}
+     */
+    loadSceneV3(data = null) {
+        if (data instanceof Object) {
+            const spots = {};
+            const spotdata = Array.isArray(data.hotspots) ? data.hotspots : [];
+            const animations = Array.isArray(data.framesets) && data.framesets || [];
+            const actions = Array.isArray(data.actions) && data.action || [];
+            const picdata = Array.isArray(data.pictures) && data.pictures || []
+            //import all scene defined hotspots
+            spotdata.filter(spot => !spots[spot.name]).forEach(spot => spots[spot.name] = spot);
+            picdata.map(content => {
+                //hook here the new group setup
+                content.group && this.addToCollection(content.group, content.picture);
+                //then create the spritesheet data
+                return this.createPictureV3(data, content, spots);
+            }).forEach(scene => {
+                animations.forEach(content => scene.add(this.importAnimation(content, spots)));
+                actions.forEach(content => scene.addAction(this.importAction(content)));
+                this.add(scene);
+            });
+        }
+    }
+    /**
+     * {content: pictures,cols,rows,fps,framesets,hotspots   |  spots: {}}
+     * @param {Object} data
+     * @param {Object} spritesheet
+     * @returns {KunScene}
+     */
+    createPictureV3(data = null, spritesheet = null) {
+        return data && spritesheet && new KunScene(
+            spritesheet.picture,
+            data.cols || 1,
+            data.rows || 1,
+            data.fps || 0,
+            spritesheet.sound || '',
+            spritesheet.loop || 0,
+            data.mode || '',
+        ) || null;
+    }
+
+    /**
+     * @param {String} name 
+     * @returns {KunSceneCollection}
+     */
+    createCollection(name = '') {
+        const group = new KunSceneCollection(name);
+        this.collections().push(group);
+        return group;
+    }
+    /**
+     * @param {String} name 
+     * @param {String} picture 
+     * @returns {KunSceneCollection}
+     */
+    addToCollection(name = '', picture = '') {
+        const collection = this.collections().find(c => c.name() === name) || this.createCollection(name);
+        collection.add(picture);
+        this.collections().push(collection);
+        return collection;
+    }
+    /**
+     * @param {Object[]} input 
+     * @returns {KunSceneCollection[]}
+     */
+    importCollections(input = []) {
+        input.filter(content => content.pictures.length).forEach(content => {
+            const group = new KunSceneCollection(content.profile);
+            content.pictures.forEach(pic => pic && group.add(pic));
+            this.collections().push(group);
+        });
+        return this.collections();
+    }
+    /**
+     * 
+     * @param {Object} frameSet 
+     * @param {Object} hotSpots 
+     * @returns {KunFrameSet}
+     */
+    importAnimation(frameSet, hotSpots = {}) {
+        const animation = new KunFrameSet(
+            frameSet.name,
+            frameSet.type,
+            frameSet.fps,
+            frameSet.loops,
+            Array.isArray(frameSet.next) ? frameSet.next : [],
+            Array.isArray(frameSet.sounds) ? frameSet.sounds : frameSet.bank || [],
+            frameSet.offsetX,
+            frameSet.offsetY
+        );
+        //import frameset
+        (Array.isArray(frameSet.frames) ? frameSet.frames : []).forEach(frame => {
+            animation.add(frame);
+        });
+        //import conditions
+        (Array.isArray(frameSet.conditions) ? frameSet.conditions : []).forEach(condition => {
+            animation.addCondition(this.importCondition(condition));
+        });
+        //merge hotspots into touchspots
+        (Array.isArray(frameSet.spots) ? frameSet.spots : []).forEach(touchSpot => {
+            if (hotSpots.hasOwnProperty(touchSpot.name)) {
+                const spot = hotSpots[touchSpot.name];
+                Object.keys(spot)
+                    .filter(name => !touchSpot.hasOwnProperty(name))
+                    .forEach(name => touchSpot[name] = spot[name]);
+                animation.addspot(this.importSpot(touchSpot));
+            }
+        });
+        //import all tags
+        (Array.isArray(frameSet.tags) ? frameSet.tags : []).forEach(tag => animation.tag(tag));
+        this._animations++;
+        return animation;
     };
     /**
      * 
-     * @param {String} pictureName 
-     * @param {Number} fps 
-     * @returns {KunSceneManager}
+     * @param {Object} content 
+     * @returns {KunAction}
      */
-    KunSceneManager.overrideFPS = function( pictureName , fps ){
-        if( this.isPlaying( pictureName ) ){
-            this._scenes[ pictureName ].setFps( fps );
+    importAction(content) {
+        this._actions++;
+        return new KunAction(content.var || 0, content.op || '', content.val,);
+    };
+    /**
+     * 
+     * @param {Object} content 
+     */
+    importCondition(content) {
+        this._conditions++;
+        return new KunCondition(content.var || 0, content.op || '', content.val || 0, content.target || false, content.on || [], content.off || []);
+    };
+    /**
+     * @param {Object} data 
+     * @returns {KunHotSpot}
+     */
+    importSpot(data) {
+        const spot = new KunHotSpot(data.name,
+            data.x1, data.y1,
+            data.x2, data.y2,
+            data.trigger || KunHotSpot.Trigger.Queue,
+            Array.isArray(data.next) && data.next || [],
+            data.sfx
+        );
+        if (data.varId > 0) {
+            //backwards compatibility.
+            spot.addAction(new KunAction(data.varId, data.behavior, data.amount || 1));
+        }
+        //No actions parameter until next versions, use varId instead for backwards compatibility
+        if (Array.isArray(data.actions)) {
+            //map all event actions
+            data.actions.forEach(content => spot.addAction(this.importAction(content)));
+        }
+        if (Array.isArray(data.conditions)) {
+            //map all event conditions
+            data.conditions.forEach(content => spot.addCondition(this.importCondition(content)));
+        }
+        if (Array.isArray(data.tags)) {
+            data.tags.forEach(tag => spot.tag(tag));
+        }
+
+        this._hotspots++;
+        return spot;
+    };
+
+
+
+    /**
+     * @returns {Object[]}
+     */
+    static listAnimationPacks() {
+        return $plugins.filter(plugin => plugin.name === 'KunAnimationPack' && plugin.status && plugin.parameters.scenes.length)
+            .map(plugin => plugin.parameters);
+    };
+    /**
+     * @returns {Object}
+     */
+    static PluginData() {
+        /**
+         * V1
+         * @param {String} key 
+         * @param {*} value 
+         * @returns {Object}
+         */
+        function _parsePluginData(key, value) {
+            if (typeof value === 'string' && value.length) {
+                try {
+                    if (/^\{.*\}$|^\[.*\]$/.test(value)) {
+                        return JSON.parse(value, _parsePluginData);
+                    }
+                } catch (e) {
+                    // If parsing fails or it's not an object/array, return the original value
+                }
+                if (value === 'true' || value === 'false') {
+                    return value === 'true';
+                }
+                if (!isNaN(value)) {
+                    return parseInt(value);
+                }
+            }
+            else if (typeof value === 'object' && !Array.isArray(value)) {
+                var _output = {};
+                Object.keys(value).forEach(key => _output[key] = _parsePluginData(key, value[key]));
+                return _output;
+            }
+            return value;
+        };
+
+        const pluginData = _parsePluginData('KunAnimations', PluginManager.parameters('KunAnimations'));
+        pluginData.scenes = pluginData.scenes || [];
+        pluginData.profiles = pluginData.profiles || [];
+
+        this.listAnimationPacks().map(pack => _parsePluginData('KunAnimationPack', pack)).forEach(function (pack) {
+            //Import animation packs
+            if (pack.scenes.length) {
+                KunScenes.DebugLog(`Loading Animation Pack ${pack.name} (${pack.scenes.length} scenes)`);
+                pack.scenes.forEach(function (scene) {
+                    pluginData.scenes.push(_parsePluginData('KunAnimationPack', scene));
+                });
+            }
+            //import stage profiles
+            if (pack.profiles && pack.profiles.length) {
+                pack.profiles.forEach(profile => {
+                    pluginData.profiles.push(_parsePluginData('KunAnimationPack', profile))
+                });
+            }
+        });
+        return pluginData;
+    };
+
+}
+
+
+
+/**
+ * @param {String} name 
+ * @param {Number} cols 
+ * @param {Number} rows 
+ * @param {Number} fps 
+ * @param {String} soundProfile 
+ * @param {Number} soundLoop
+ * @param {String} mode [move,touch,diabled ...]
+ */
+class KunScene {
+    constructor(name, cols = 1, rows = 1, fps = 0, soundProfile = '', soundLoop = 0, mode = '') {
+        this._name = name || '';
+        this._cols = cols || 1;
+        this._rows = rows || 1;
+        //this._framesets = {};
+        this._framesets = [];
+        //this one can be overriden
+        this._fps = fps || KunScenes.manager().FPS();
+        this._audioProfile = soundProfile || '';
+        this._audioLoop = soundLoop || 0;
+        //this._dynamic = canmove || false;
+        this._mode = mode || KunAnimation.Mode.Default;
+        this._actions = [
+            //KunActions
+        ];
+    }
+    /**
+     * @param {String} alias or local name
+     * @param {Number} pictureid
+     * @param {Boolean} autoplay
+     * @param {String} first 
+     * @returns {KunAnimation}
+     */
+    createAnimation(alias = '', pictureid = 0, autoplay = false, first = '') {
+        switch (this.mode()) {
+            case KunAnimation.Mode.Moving:
+                return new KunMovingAnimation(this, alias, pictureid, autoplay, first);
+            case KunAnimation.Mode.Touch:
+                return new KunInteractiveAnimation(this, alias, pictureid, autoplay, first);
+            default:
+                return new KunAnimation(this, alias, pictureid, autoplay, first);
+        }
+    };
+    /**
+     * @returns {String}
+     */
+    toString() {
+        return this.name();
+    };
+    /**
+     * @returns {String}
+     */
+    name() {
+        return this._name;
+    };
+    /**
+     * @returns {String}
+     */
+    mode() { return this._mode; }
+    /**
+     * @returns {KunFrameSet[]}
+     */
+    framesets() { return this._framesets; };
+    /**
+     * @returns {Number}
+     */
+    cols() { return this._cols; }
+    /**
+     * @returns {Number}
+     */
+    rows() { return this._rows; }
+    /**
+     * @returns {Number}
+     */
+    totalFrames() { return this._cols * this._rows; };
+    /**
+     * @param {String} name 
+     * @returns {Boolean}
+     */
+    has(name = '') {
+        return name && this.framesets().filter(fs => fs.name() === name).length > 0;
+    }
+    /**
+     * @param {KunFrameSet} frameset 
+     * @returns {KunScene}
+     */
+    add(frameset) {
+        if (frameset instanceof KunFrameSet) {
+            this.framesets().push(frameset);
         }
         return this;
     };
     /**
-     * @param {String} sfx
-     * @returns KunSceneManager
+     * @returns {Boolean}
      */
-    KunSceneManager.playFx = function( sfx ){
-        KunSceneManager.PlayFX( typeof sfx === 'string' && sfx.length ? sfx : this.sfx() );
+    empty() {
+        return this.framesets().length === 0;
+    };
+    /**
+     * @param {String} sound
+     * @returns {String}
+     */
+    soundProfile(sound = '') {
+        return sound ? this._audioProfile && this._audioProfile + '-' + sound || sound : this._audioProfile;
+    };
+    /**
+     * @returns {Number}
+     */
+    soundLoop() {
+        return this._audioLoop;
+    };
+    /**
+     * @returns {Number}
+     */
+    fps() {
+        return this._fps || KunScenes.manager().FPS();
+    };
+    /**
+     * @param {KunAction} action
+     * @returns {KunScene}
+     */
+    addAction(action, tag = '') {
+        if (action instanceof KunAction) {
+            this._actions.push(action.tag(tag));
+        }
         return this;
     };
-
-KunSceneManager.PluginParameters = function(){
-    return PluginManager.parameters('KunAnimations');
-};
-/**
- * @param {Array} base 
- * @returns Array
- */
-KunSceneManager.importAnimationPacks = function( base ){
-    // import more Animation packages from external plugin
-    //return typeof KunAnimationPacks === 'function' ? KunAnimationPacks.initialize().import( base ) : base;
-    var packs = PluginManager.parameters('KunAnimationPack');
-    for( var i = 0 ; i < KunSceneManager.animationPacks() ; i++ ){
-        var header = 'pack' + ( i + 1).toString();
-        if( packs.hasOwnProperty( header ) && packs[header].length > 0 ){
-            var counter = 0;
-            JSON.parse(packs[header]).forEach( function( pack ){
-                base.push(pack);
-                counter++;
-            });
-            KunSceneManager.DebugLog( `Added ${counter} scenes from ${header} extension.` );
-        }
-    }
-
-    return base;
-};
-
-
-function KunSceneImporter(){
-
-};
-/**
- * @param {String} content 
- * @param {Object} onDefault 
- * @returns Object
- */
-KunSceneImporter.parse = function( content , onDefault ){
-    return typeof content === 'string' && content.length ? JSON.parse( content ) : (onDefault || null);
-};
-/**
- * @param {String} content 
- * @returns Array
- */
-KunSceneImporter.parseArray = function( content ){
-    return typeof content === 'string' && content.length > 0 ?  (/^\[.*\]$/.test(content) ? JSON.parse(content) : [content])   : []
-};
-
-/**
- * @param {Object[]} input 
- * @returns KunSceneManager
- */
-KunSceneManager.ImportScenes = function( input ){
-
-    var _spotCounter = 0;
-    var _layerCounter = 0;
-    var _pictureCounter = 0;
-    var _actionCounter = 0;
-    var _conditionCounter = 0;
-
-    //input.map( ctl => ctl.length > 0 ? JSON.parse( ctl ) : null ).forEach(function( ctl ){
-    KunSceneManager.importAnimationPacks( input ).map( controller => KunSceneImporter.parse( controller ) ).filter( controller => controller !== null ).forEach(function( ctl ){
-            //var _pictures = typeof ctl.source === 'string' && ctl.source.length > 0 ?  (/^\[.*\]$/.test(ctl.source) ? JSON.parse(ctl.source) : [ctl.source])   : [];
-            //var prefix = typeof ctl.prefix === 'string' && ctl.prefix.length > 0 ? JSON.parse( ctl.prefix ) : [];
-            var _pictures = KunSceneImporter.parseArray(ctl.source);
-            var prefix = KunSceneImporter.parseArray( ctl.soundBankPrefix );
-            var _scenes = [];
-            var _spots = {};
-
-            //Match fix to the next update and backwards compatibility with a single string value
-            for( var i = 0 ; i < _pictures.length ; i++ ){
-                _scenes.push( new KunAnimationScene(
-                    _pictures[i],
-                    parseInt(ctl.cols),
-                    parseInt(ctl.rows),
-                    parseInt( ctl.fps || 0 ),
-                    prefix.length > i ? prefix[i] : '' ) );
-            }
-            //import all scene defined hotspots
-            //( ctl.hotspots.length ? JSON.parse(ctl.hotspots) : [] ).map( spot => JSON.parse(spot) ).forEach(function( spot ){
-            KunSceneImporter.parse(ctl.hotspots , []).map( spot => JSON.parse(spot) ).forEach(function( spot ){
-                    if( !_spots.hasOwnProperty( spot.name ) ){
-                        _spots[spot.name] = spot;
-                    }
-            });
-            //prepare the layer framesets
-            KunSceneImporter.parse( ctl.framesets , [] ).map( fs => KunSceneImporter.parse( fs ) ).filter( fs => fs !== null ).forEach(function(fs){
-                    _layerCounter++;
-                    //leave this here for debugging.
-                    if( KunSceneManager.debug(KunSceneManager.DebugMode().TraceLog) ){
-                        KunSceneManager.DebugLog(`Reading ${ctl.source}.${fs.name}`);
-                    }
-                    var _layer = new KunAnimationLayer(
-                        fs.name ,
-                        fs.type ,
-                        parseInt(fs.fps) ,
-                        parseInt( fs.loops),
-                        fs.next.length > 0 ? JSON.parse(fs.next) : '' ,
-                        //typeof fs.bank === 'string' && fs.bank.length > 0 ?  (/^\[.*\]$/.test(fs.bank) ? JSON.parse(fs.bank) : [fs.bank])   : [], //Match fix to the next update and backwards compatibility with a single string value
-                        KunSceneImporter.parseArray( fs.bank ),
-                        fs.offsetX, fs.offsetY,
-                        fs.clearTargets === 'true' );
-                    //( fs.frames.length > 0 ? JSON.parse(fs.frames) : [] ).map( frame => parseInt( frame ) ).forEach(function( frame ){
-                    //import layer frames
-                    KunSceneImporter.parse( fs.frames , [] ).map( frame => parseInt( frame ) ).forEach(function( frame ){
-                        _layer.add( frame );
-                    });
-                    //import layer actions
-                    KunSceneImporter.parse( fs.actions , []).map( action => JSON.parse(action)).forEach( function( action ){
-                        _layer.addAction(new KunLayerAction(
-                            parseInt(action.var || 0 ),
-                            action.op || '',
-                            parseInt(action.val || 0 ),
-                            KunSceneImporter.parse( action.swon , []),
-                            KunSceneImporter.parse( action.swoff , []),
-                            action.runOnce === 'true'
-                        ));
-                        _actionCounter++;
-                    });
-                    //import layer conditions
-                    KunSceneImporter.parse( fs.conditions , []).map( condition => JSON.parse(condition)).forEach( function( condition ){
-                        _layer.addCondition( new KunLayerCondition(
-                            parseInt(condition.var || 0 ),
-                            condition.op || '',
-                            parseInt(condition.val || 0 )
-                        ));
-                        _conditionCounter++;
-                    });
-                    //( _events ).map( s => s.length > 0 ? JSON.parse(s) : null ).forEach(  function( s ){
-                    //import layer events
-                    KunSceneImporter.parse( fs.spots , []).map( spot => KunSceneImporter.parse( spot ) ).forEach(  function( spot ){
-                            var event = new KunTouchEvent(
-                                spot.name,
-                                parseInt(_spots[spot.name].x1),
-                                parseInt(_spots[spot.name].y1),
-                                parseInt(_spots[spot.name].x2),
-                                parseInt(_spots[spot.name].y2),
-                                parseInt(_spots[spot.name].varId || 0),
-                                parseInt(_spots[spot.name].amount || 1),
-                                _spots[spot.name].behavior || KunTouchEvent.Behaviour.Increase,
-                                spot.trigger || KunTouchEvent.Trigger.Queue,
-                                _spots[spot.name].sfx,
-                                //spot.next.length > 0 ? JSON.parse(s.next) : []  );
-                                KunSceneImporter.parseArray( spot.next , [] )  );
-                            _layer.registerSpot(event);
-                            _spotCounter++;
-                    });
-                    //KunSceneManager.DebugLog( _layer.spots() );
-                    if( _layer.count() > 0 ){
-                        _scenes.forEach( function( scene ){
-                            scene.add( _layer );
-                        } );
-                    }
-            });
-
-            _scenes.forEach( function( scene ){
-                if( scene.countFrames() ){
-                    KunSceneManager.addScene( scene );
-                }
-            });
-    });
-    //leave this here for debugging.
-    if( KunSceneManager.debug(KunSceneManager.DebugMode().TraceLog) ){
-        KunSceneManager.DebugLog(`Imported a total of ${_pictureCounter} animated pictures, ${_layerCounter} animation layers and ${_spotCounter} hotspots`);
-        KunSceneManager.DebugLog(`Imported a total of ${_actionCounter} actions and  ${_conditionCounter} conditions`);
-    }
-
-    return this;
-};
-/**
- * @param {Object[]} input 
- * @returns KunSceneManager
- */
-/*KunSceneManager.ImportSoundBanks = function( input ){
-    (input).map( sb => sb.length > 0 ? JSON.parse( sb ) : null ).forEach( function( bank ){
-        var sb = new KunSoundBank( bank.name , bank.chance , bank.interrupt === 'true' , parseInt( bank.round  ||  0 ) );
-        (bank.pitch.length > 0 ? JSON.parse(bank.pitch) : []).map(pitch => parseInt( pitch )).forEach(function( pitch ){
-            sb.addPitch( pitch );
-        });
-        (bank.pan.length > 0 ? JSON.parse(bank.pan) : []).map(pan => parseInt( pan )).forEach(function( pan ){
-            sb.addPan( pan );
-        });
-        (bank.volume.length > 0 ? JSON.parse(bank.volume) : []).map(volume => parseInt( volume )).forEach(function( volume ){
-            sb.addVol( volume );
-        });
-        (bank.sfx.length > 0 ? JSON.parse(bank.sfx) : []).forEach(function( se ){
-            //if( KunSceneManager.SoundEffectExists(se)){
-                sb.addSe( se );
-            //}
-        });
-        KunSceneManager.addBank( sb );
-    });
-    return this;
-};*/
-/**
- * @returns Object
- */
-KunSceneManager.Mode = function(){
-    return {
-        'Disabled': 'disabled',
-        'Touch': 'touch',
-        'Capture': 'capture',
+    /**
+     * @param {String} tag
+     * @returns {KunAction[]}
+     */
+    actions(tag = '') {
+        return tag ? this._actions.filter(action => action.is(tag)) : this._actions;
     };
-};
-KunSceneManager.Behavior = {
-    'Forward': 'forward',
-    'Reverse': 'reverse',
-    'PingPong': 'ping-pong',
-    'Static': 'static',
-};
-
-KunSceneManager.Capture = [];
-/**
- * @param {String} sfx 
- * @param {Number} pitch
- * @param {Number} pan
- */
-KunSceneManager.PlayFX = function( sfx , pitch , pan ){
-        if(  sfx.length ){
-            if( typeof pitch !== 'number' ){
-                pitch = 90 + Math.floor(Math.random() * 20);
-            }
-            if( typeof pan !== 'number' ){
-                pan = Math.floor(Math.random() * 20) - 10;
-            }
-            this.AudioManager( sfx , 100 , pitch , pan );
-            //AudioManager.playSe({name: sfx , pan: pan, pitch: pitch, volume: 100});
-        }
-};
-/**
- * 
- * @param {String} se 
- * @param {Number} volume 
- * @param {Number} pitch 
- * @param {Number} pan 
- * @param {Boolean} interrupt
- */
-KunSceneManager.AudioManager = function( se , volume , pitch , pan , interrupt ){
-    if( se.length ){
-        if( typeof interrupt === 'boolean' && interrupt ){
-            AudioManager.stopSe();
-        }
-        //KunSceneManager.DebugLog( `Playing ${se} at vol ${volume}, pitch ${pitch} and pan ${pan} ${interrupt}` );
-        AudioManager.playSe({name: se , pan: pan || 0, pitch: pitch || 100, volume: volume || 90 } );
-    }
-};
-/**
- * @param {String} message 
- */
-KunSceneManager.DebugLog = function( message ){
-    if( KunSceneManager.debug() ){
-        console.log( typeof message === 'object' ? message : `[ KunSceneManager ] ${message.toString()}` );
-    }
-};
-/**
- * @param {String} name 
- * @returns Boolean
- */
-KunSceneManager.SoundEffectExists = function( name ){
-    return this.FileExists( this.FilePath( name + AudioManager.audioFileExt() ) );
-}
-/**
- * @param {String} path 
- * @returns Boolean
- */
-KunSceneManager.FileExists = function( path ){
-
-    var fs = require('fs');
-    if( fs.existsSync( path )){
-        return true;
-    }
-
-    if( KunSceneManager.debug( KunSceneManager.DebugMode().TraceLog ) ){
-        KunSceneManager.DebugLog( `File missing ${path}` );
-    }
-
-    return false;
-};
-/**
- * @param {String} file 
- * @returns String
- */
-KunSceneManager.FilePath = function( file ){
-    var path = require('path');
-    var base = path.dirname(process.mainModule.filename);
-    return path.join(base, `audio/se/${file}`);
-};
-
-
-/**
- * 
- */
-//function KunAnimationScene(){
-    //this.initialize.apply( this , arguments );
-//}
-
-//KunAnimationScene.prototype.initialize = function( name , cols , rows , fps , prefix ){
-function KunAnimationScene( name , cols , rows , fps , prefix ){
-
-    this._name = name;
-    this._cols = cols || 1;
-    this._rows = rows || 1;
-    this._animationLayers = {
-        //setup frameset collection here
+    /**
+     * @param {String} tag
+     * @returns {KunScene}
+     */
+    runActions(tag = '') {
+        this.actions(tag).forEach(action => action.update());
+        return this;
     };
-    this._elapsed = 0;
-    this._loopCount = 0;
-    this._reverse = false;
-    this._playing = false;
+}
 
-    this._index = 0;
-    this._current = '';
-
-    this._defaultFps = fps || KunSceneManager.defaultFps();
-    //this one can be overriden
-    this._fps = this._defaultFps;
-    this._touching = false;
-    this._prefix = typeof prefix === 'string' && prefix.length ? prefix : '';
-    //this._touch = [];
-    //use this to capture coordinates in Dev Mode
-    this._capture = [];
-};
 /**
- * @returns Boolean
+ * handle quick command picture loading and replacing from the animation system
+ * @class {KunPicture}
  */
-KunAnimationScene.prototype.isValid = function(){
-    return this._name !== 'INVALID' && !this.empty();
-};
-/**
- * @returns Boolean
- */
-KunAnimationScene.prototype.isReady = function(){
-    return this._current.length > 0 && this.has(this._current);
-};
-/**
- * @returns String
- */
-KunAnimationScene.prototype.toString = function(){ return this.name(); };
-/**
- * @returns String
- */
-KunAnimationScene.prototype.name = function(){ return this._name; };
-/**
- * @returns KunAnimationLayer
- */
-KunAnimationScene.prototype.current = function(){ return this.isReady() ? this.layers()[this._current] : null; };
-/**
- * @returns Boolean
- */
-KunAnimationScene.prototype.canTouch = function(){
-    var current = this.current();
-    return current !== null ? current.isInteractive() : false;
-};
-/**
- * 
- * @param {Number} x 
- * @param {Number} y 
- * @returns KunTouchEvent
- */
-KunAnimationScene.prototype.getTouched = function( x , y ){
-
-    var current = this.current();
-    return current !== null ? current.touchSpot( x , y ) : null;
-};
-/**
- * 
- * @param {Number} x 
- * @param {Number} y 
- * @param {Number} sx
- * @param {Number} sy
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.touch = function( x  , y , sx , sy){
-    //console.log(`${x},${y} (${sx},${sy})`);
-    //console.log(this.current().name());
-    var spot = this.getTouched(x , y);
-    //console.log( spot );
-    if( spot !== null ){
-        switch( spot.trigger() ){
-            case KunTouchEvent.Trigger.Queue:
-                //KunSceneManager.enqueue( `${this.name()}.${spot.name()}` , x , y , sx , sy );
-                KunSceneManager.enqueue( this.name() , spot.name() , sx , sy );
-                break;
-            case KunTouchEvent.Trigger.Instant:
-                //perform spot update
-                spot.update();
-                //export X and Y positions
-                KunSceneManager.exportPosition( sx , sy );
-                //jump to next frameset (if any)
-                this.changeLayer( spot.next(), true );
-                break;
-            case KunTouchEvent.Trigger.Frame:
-                this.changeLayer(spot.next());
-                spot.setValue(this.current().first()).touchSfx();
-                break;
+class KunPicture {
+    /**
+     * @param {String} picture 
+     * @param {Number} pictureid 
+     */
+    constructor(picture = '', pictureid = 0) {
+        this._picture = picture || '';
+        this._id = pictureid || 0;
+    }
+    /**
+     * @returns {String}
+     */
+    name() { return this._picture; }
+    /**
+     * @returns {Number}
+     */
+    id() { return this._id; }
+    /**
+     * @returns {Boolean}
+     */
+    ready() { return !!this.name() && !!this.id(); }
+    /**
+     * @returns {Game_Picture}
+     */
+    gamePicture() { return this.id() && $gameScreen.picture(this.id()) || null; }
+    /**
+     * @returns {KunPicture}
+     */
+    remove() {
+        this.id() && $gameScreen.erasePicture(this.id());
+        return this;
+    }
+    /**
+     * @returns {Number[]}
+     */
+    position() {
+        const gp = this.gamePicture();
+        return gp && [
+            Math.floor(gp.x()),
+            Math.floor(gp.y()),
+        ] || [0, 0];
+    }
+    /**
+     * @returns {Number[]}
+     */
+    scale() {
+        const gp = this.gamePicture();
+        //return gp && [gp.scaleX(),gp.scaleY()] || [100,100];
+        return gp && [gp.scaleX(), gp.scaleY()] || [0, 0];
+    }
+    /**
+     * Transform x,y screen touch coordinates into local spot coordinates using scale and picture location
+     * @param {Game_Picture} picture 
+     * @returns {Number[]}
+     */
+    offset(x = 0, y = 0) {
+        const scale = this.scale();
+        const local = this.position();
+        //must return zero if scale is not set???
+        //return [x,y].map( (v , i) => scale[i] && Math.floor((v - local[i]) * 100 / scale[i]) || 0 );
+        return [x, y].map((v, i) => scale[i] && Math.floor((v - local[i]) * 100 / scale[i]) || v);
+    }
+    /**
+     * Apply transitions and tints, some day. Now just let the picture be updated
+     * @param {Number} opacity 
+     * @param {Number} blend 
+     */
+    applyEffects(opacity = 255, blend = 0) {
+        this.applyBlending(blend);
+        this.applyOpacity(opacity);
+    }
+    /**
+     * @param {Number} blend 
+     * @returns {KunPicture}
+     */
+    applyBlending(blend = KunPicture.Blending.Normal) {
+        const blending = Object.values(KunPicture.Blending);
+        const gp = this.gamePicture();
+        if (gp) {
+            gp._blendMode = blend % blending.length;
         }
-        
+        return this;
     }
-    return this;
-};
-/**
- * @returns Array
- */
-KunAnimationScene.prototype.capture = function(){
-    return this._capture;
-};
-/**
- * @param {Number} x 
- * @param {Number} y 
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.captureFrom = function( x , y ){
-    this._capture = [x , y];
-    return this;
-};
-/**
- * 
- * @param {Number} x 
- * @param {Number} y 
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.captureTo = function( x , y ){
-    if( this._capture.length === 2 ){
-        this._capture.push(x);
-        this._capture.push(y);
-        //sort and arrrange
-        if( this._capture[0] > this._capture[2]){
-            var mx = this._capture[0];
-            this._capture[0] = this._capture[2];
-            this._capture[2] = mx;
+    /**
+     * @param {Number} opacity 
+     * @returns {KunPicture}
+     */
+    applyOpacity(opacity = 255) {
+        const gp = this.gamePicture();
+        if (gp) {
+            gp._opacity = opacity % 256; //(this._opacity * (d - 1) + this._targetOpacity) / d;
         }
-        if( this._capture[1] > this._capture[3]){
-            var my = this._capture[1];
-            this._capture[1] = this._capture[3];
-            this._capture[3] = my;
+        return this;
+    }
+    /**
+     * Backwards compatibility
+     * @param {Number} x 
+     * @param {Number} y 
+     * @param {Number} scaleX 
+     * @param {Number} scaleY 
+     * @param {Number} opacity 
+     * @param {Number} blend 
+     * @param {Number} origin
+     * @returns {Game_Picture}
+     */
+    prepare(x = 0, y = 0, scaleX = 100, scaleY = 100, opacity = 255, blend = 0, origin = 0) {
+        return this.show(x, y, scaleX, scaleY, opacity, blend, origin);
+    }
+    /**
+     * @param {Number} x 
+     * @param {Number} y 
+     * @param {Number} scaleX 
+     * @param {Number} scaleY 
+     * @param {Number} opacity 
+     * @param {Number} blend 
+     * @param {Number} origin
+     * @returns {Game_Picture}
+     */
+    show(x = 0, y = 0, scaleX = 100, scaleY = 100, opacity = 255, blend = 0, origin = 0) {
+        if (this.ready) {
+            $gameScreen.showPicture(
+                this.id(), this.name(),
+                origin || 0, // origin (top-left)
+                x || 0, y || 0, scaleX || 100, scaleY || 100,
+                opacity || 255, blend || 0);
+            //console.log($gameScreen.picture(this.id()));
+            return $gameScreen.picture(this.id());
         }
-        KunSceneManager.DebugLog( `Capture Coords: ${this._capture.join( ' ' )}` );
-    }
-    return this.clearCapture();
-};
-/**
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.clearCapture = function(){
-    this._capture = [];
-    return this;
-};
-/**
- * @returns Boolean
- */
-KunAnimationScene.prototype.playing = function(){ return this._playing; }
-/**
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.stop = function(){
-    this._playing = false;
-    return this;
-};
-/**
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.resume = function(){
-    this._playing = true;
-    return this;
-};
-/**
- * @returns Number
- */
-KunAnimationScene.prototype.getFrame = function(){
-    return this.isReady() ? this.layers()[this._current].getFrame( this._index ) : 0;
-};
-/**
- * @returns Number
- */
-KunAnimationScene.prototype.index = function(){ return this._index; }
-/**
- * @returns Number
- */
-KunAnimationScene.prototype.cols = function(){ return this._cols; }
-/**
- * @returns Number
- */
-KunAnimationScene.prototype.rows = function(){ return this._rows; }
-/**
- * @returns Number
- */
-KunAnimationScene.prototype.totalFrames = function(){ return this._cols * this._rows; };
-/**
- * @param {String} layer 
- * @returns Boolean
- */
-KunAnimationScene.prototype.has = function( layer ){
-    return typeof layer === 'string' && layer.length > 0 && this.layers().hasOwnProperty( layer );
-}
-/**
- * @param {KunAnimationLayer} layer 
- * @returns {KunAnimationScene}
- */
-KunAnimationScene.prototype.add = function( layer ){
-    if( layer instanceof KunAnimationLayer ){
-        this.layers()[ layer.name() ] = layer;
-        if( this._current.length === 0 ){
-            this._current = layer.name();
-            //this.changeLayer( layer.name());
-        }
-    }
-    return this;
-};
-/**
- * @param {Number} fps 
- * @returns {KunAnimationScene}
- */
-KunAnimationScene.prototype.setFps = function( fps ){
-    switch( true ){
-        case typeof fps === 'number' && fps > 0:
-            this._fps = fps;
-            break;
-        case this.has(this._current):
-            this._fps = this.current().fps() || this.defaultFps();
-            break;
-        default:
-            this._fps = this.defaultFps();
-            break;
-    }
-    return this;
-};
-/**
- * @param {Boolean} list 
- * @returns KunAnimationLayer[] | Object
- */
-KunAnimationScene.prototype.layers = function( list ){
-    return typeof list === 'boolean' && list ? Object.values( this._animationLayers ) : this._animationLayers;
-}
-/**
- * @returns Boolean
- */
-KunAnimationScene.prototype.empty = function(){
-    return this.layers(true).length === 0;
-};
-/**
- * @returns {Number}
- */
-KunAnimationScene.prototype.countFrames = function(){
-    return this.has(this._current) ? this.current().count() : 0;
-};
-/**
- * @param {String} layer
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.beforeChangeLayer = function( layer ){
-    if( this.has(layer) && this.layers()[layer].clearTargetQueue()){
-        //clear target queue on change from this scene to another
-        KunSceneManager.clearTargets();
-    }
-    return this;
-};
-/**
- * @param {String} layer 
- * @param {Boolean} play
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.changeLayer = function( layer , play ){
-    if( this.has( layer ) ){
-        this.beforeChangeLayer( layer );
-        this._current = layer;
-        var layerFps = this.current().fps();
-        return this.reset( typeof play === 'boolean' && play ).setFps(layerFps).afterChangeLayer();
-    }
-    return this;
-}
-/**
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.afterChangeLayer = function( ){
-    var current = this.current();
-    if( current !== null ){
-        //run all enqueued actions
-        current.runActions();
-    }
-    return this;
-};
-/**
- * @param {String[]} layers
- * @param {Boolean} filterLocked
- * @returns {String}
- */
-KunAnimationScene.prototype.selectLayer = function( layers , filterLocked ){
-    if( typeof filterLocked === 'boolean' && filterLocked ){
-        layers = this.layers(true)
-            .filter( fs => layers.includes(fs.name()) && fs.isUnlocked())
-            .map( fs => fs.name());
-    }
-    switch( true ){
-        case layers.length > 1:
-            return layers[ Math.floor( Math.random() * layers.length ) ];
-        case layers.length > 0:
-            return layers[0];
-        default:
-            return '';
-    }
-}
-/**
- * @param {Boolean} replay
- * @returns {KunAnimationScene}
- */
-KunAnimationScene.prototype.next = function( replay ){
-    var next = this.isReady() ? this.selectLayer( this.current().next() , true ) : '';
-    if( next.length > 0 ){
-        return this.changeLayer( next , true );
-    }
-    if( typeof replay === 'boolean' && replay ){
-        return this.reset(true);
-    }
-    else{
-        this._playing = false;
-    }
-    return this;
-};
-/**
- * @returns {KunAnimationScene}
- */
-KunAnimationScene.prototype.first = function(){
-    if(!this.empty()){
-        return this.changeLayer(this.layers(true)[0].name(), true );
-    }
-    return this;
-};
-/**
- * @param {Boolean} play
- * @returns {KunAnimationScene}
- */
-KunAnimationScene.prototype.reset = function( play ){
-    this._loopCount = this.current().loops();
-    switch(this.current().behavior()){
-        case KunSceneManager.Behavior.Reverse:
-            this._reverse = true;
-            this._index = this.countFrames() - 1;
-            break;
-        case KunSceneManager.Behavior.Forward:
-            this._reverse = false;
-            break;
-        case KunSceneManager.Behavior.PingPong:
-            this._reverse = false;
-            break;
-        case KunSceneManager.Behavior.Static:
-            break;
-    }
-    this._playing = (typeof play === 'boolean' && play ) || this._playing;
-    return this.playBank( this._prefix );
-}
-/**
- * @param {Number} round
- * @returns {KunAnimationScene}
- */
-KunAnimationScene.prototype.playBank = function( round ){
-    if( this.playing() ){
-        this.current().playBank( this._prefix , round );
-    }
-    return this;
-};
-/**
- * @returns {KunAnimationScene}
- */
-KunAnimationScene.prototype.playBankByRound = function( loop ){
-    if( this.playing() ){
-        var bank = this.current().selectSoundBank();
-        if( bank.length > 0 ){
-            KunSceneManager.playBank( bank , loop );
-        }
-    }
-    return this;
-};
-/**
- * @returns Number
- */
-KunAnimationScene.prototype.defaultFps = function(){
-    return this._defaultFps;
-};
-/**
- * @returns Number
- */
-KunAnimationScene.prototype.FPS = function(){
-    return this._fps;
-};
-/**
- * @returns {KunAnimationScene}
- */
-KunAnimationScene.prototype.update = function(){
-    if( this.playing() ){
-        this._elapsed = ++this._elapsed % this.FPS();
-        if( this._elapsed === 0 ){
-            switch( this.current().behavior() ){
-                case KunSceneManager.Behavior.PingPong:
-                    this.updatePingPong();
-                    break;
-                case KunSceneManager.Behavior.Reverse:
-                    this.updateReverse();
-                    break;
-                case KunSceneManager.Behavior.Static:
-                    //do not change
-                    break;
-                case KunSceneManager.Behavior.Forward:
-                default:
-                    this.updateForward();
-                    break;
+        return null;
+    };
+    /**
+     * @returns {Game_Picture}
+     */
+    replace(name = '') {
+        if (this.ready() && name) {
+            const original = $gameScreen.picture(this.id());
+            //console.log('To be replaced',original);
+            if (name !== this.name()) {
+                this._picture = name;
+                return this.show(
+                    original.x(), original.y(),
+                    original.scaleX(), original.scaleY(),
+                    original.opacity(), original.blendMode(),
+                    original.origin());
             }
-            //this.changeLayer(KunSceneManager.getOverride(this._name));
-    
-            return true;
-        }    
-    }
-    return false;
-};
-/**
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.updatePingPong = function(){
-    if( !this._reverse ){
-        //ping
-        this._index = ( this._index + 1 ) % this.countFrames();
-        if( this._index === 0 ){
-            this._reverse = true;
+            return this;
         }
-    }
-    else if(this._index > 0){
-        //pong
-        this._index--;
-    }
-    //after complete the round
-    if( this._index === 0 && this._reverse ){
-        if( this._loopCount > 0 ){
-            this._loopCount--;
-            if( this._loopCount === 0 ){
-                //change state
-                return this.next(true);
-            }
-            this.playBankByRound(this._loopCount);
-        }
-        this._reverse = false;
-    }
-    return this;
+        return null;
+    };
 }
 /**
- * @returns KunAnimationScene
+ * @type {KunPicture.Blending|Number}
  */
-KunAnimationScene.prototype.updateReverse = function(){
-    if( this._index > 0 ){
-        this._index--;
-    }
-    else{
-        if( this._loopCount > 0 ){
-            this._loopCount--;
-            if( this._loopCount === 0 ){
-                //change state
-                return this.next(true);
-            }
-            this.playBankByRound(this._loopCount);
-        }
-        //reset counter
-        this._index = this.countFrames()-1;
-    }
-    return this;
-}
-/**
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.updateForward = function(){
-    this._index = ( this._index + 1 ) % this.countFrames();
-    if( this._index === 0 ){
-        if( this._loopCount > 0 ){
-            this._loopCount--;
-            if( this._loopCount === 0 ){
-                //change state
-                return this.next(true);
-            }
-            this.playBankByRound(this._loopCount);
-        }
-        this._index = 0;
-    }
-    return this;
-}
-
-/**
- * @returns KunAnimationScene
- */
-KunAnimationScene.prototype.instance = function(){
-    var copy = new KunAnimationScene( this._name, this._cols,this._rows , this.FPS() , this._prefix );
-    copy._frameSets = this.layers();
-    copy._current = this._current;
-    return copy.reset();
-};
-/**
- * @returns KunAnimationScene|Object
- */
-KunAnimationScene.prototype.dump = function(){
-    return this;
+KunPicture.Blending = {
+    Normal: 0,
+    Add: 1,
+    Multiply: 2,
+    Screen: 3,
 };
 
 /**
- * @returns 
+ * Manage animation collections with this helper
+ * @class {KunSceneCollection}
  */
-KunAnimationScene.INVALID = new KunAnimationScene('INVALID');
+class KunSceneCollection {
+    /**
+     * @param {String} name 
+     */
+    constructor(name = 'collection') {
+        this._name = name;
+        this._scenes = [];
+    }
+    /**
+     * @returns {KunScenes}
+     */
+    manager() { return KunScenes.manager(); }
+    /**
+     * @returns {String}
+     */
+    name() { return this._name; }
+    /**
+     * @param {Boolean} map
+     * @returns {String[]|KunScene[]}
+     */
+    scenes(map = false) {
+        return map && this._scenes
+            .map(picture => this.manager().scene(picture))
+            .filter(scn => !!scn) || this._scenes;
+    }
+    /**
+     * @returns {Number}
+     */
+    count() { return this.scenes().length }
+    /**
+     * @param {String} picture 
+     * @returns {KunSceneCollection}
+     */
+    add(picture = '') {
+        if (!this.scenes().includes(picture)) {
+            this._scenes.push(picture);
+        }
+        return this;
+    }
+    //stages() { }
+    /**
+     * Create an animation and alias from a profile setup
+     * @param {String} alias
+     * @param {Number} id 
+     * @param {String} first 
+     * @param {Boolean} random
+     * @returns {KunAnimation}
+     */
+    load(alias = '', id = 0, first = '' , random = false ) {
+        const stage = alias || this.name();
+        //const scenes = this.scenes(true); //map scenes from the manager
+        const scenes = this.scenes();
+        if (scenes.length) {
+            //this.manager().scene(picture)
+            const index = random && Math.floor(Math.random() * scenes.length) || 0;
+            const scene = this.manager().scene(scenes[index]);
+            const animation = scene.createAnimation(alias, id, '', !!first, first);
+            scenes.forEach((picture, index) => {
+                animation.addStage(`${stage}_${index + 1}`, picture );
+            });
+            return animation;
+        }
+        return null;
+    };
+}
 
-
-//function KunAnimationLayer(){ this.initialize.apply( this , arguments ); };
-//KunAnimationLayer.prototype = Object.create(Sprite.prototype);
 /**
- * 
  * @param {String} name 
  * @param {String} type 
  * @param {Number} fps 
  * @param {Number} loops 
  * @param {String} next 
- * @param {String} bank
+ * @param {String[]|String} sounds
  * @param {Number} offsetX
  * @param {Number} offsetY
  */
-//KunAnimationLayer.prototype.initialize = function( name , type , fps, loops , next , bank , offsetX , offsetY , clearTargets ){
-function KunAnimationLayer( name , type , fps, loops , next , bank , offsetX , offsetY , clearTargets ){
-    this._name = name.toLowerCase().replace(/[\s\_]/,'-');
-    this._fps = typeof fps === 'number' && fps > 0 ? fps : 0;
-    this._frames = [];
-    this._type = type || KunSceneManager.Behavior.Default;
-    this._loops = loops || 0;
-    this._offsetX = offsetX || 0;
-    this._offsetY = offsetY || 0;
-    this._clearTargets = typeof clearTargets === 'boolean' && clearTargets;
-    this._spots = {
-        //interactive spots to touch
-    };
-    this._next = Array.isArray( next ) ? next  : ( typeof next === 'string' && next.length ? [next] : [] );
-    this._bank = Array.isArray(bank) ? bank : ( typeof bank === 'string' && bank.length ? [bank] : []) ;
+class KunFrameSet {
+    constructor(name, type = KunAnimation.Behavior.Default, fps = 0, loops = 0, next = [], sounds = [], offsetx = 0, offsety = 0) {
+        this._name = name.toLowerCase().replace(/[\s\_]/, '-');
+        this._fps = typeof fps === 'number' && fps > 0 ? fps : 0;
+        this._frames = [];
+        this._type = type || KunAnimation.Behavior.Default;
+        this._loops = loops || 0;
+        this._offset = [offsetx || 0, offsety || 0];
+        //this._offsetX = offsetx || 0;
+        //this._offsetY = offsety || 0;
+        this._tags = [];
+        this._spots = [];
 
-    this._actions = [
-        //add here all actions to run when this frameset plays
-    ];
-    this._conditions = [
-        //add here all conditions to run when this frameset plays
-    ];
-};
-/**
- * @param KunLayerAction action
- * @returns KunAnimationLayer
- */
-KunAnimationLayer.prototype.addAction = function( action ){
-    if( action instanceof KunLayerAction ){
-        this._actions.push( action );
-    }
-    return this;
-};
-/**
- * @returns KunLayerAction[]
- */
-KunAnimationLayer.prototype.actions = function(){
-    return this._actions;
-};
-/**
- * @returns KunAnimationLayer
- */
-KunAnimationLayer.prototype.runActions = function(){
-    //KunSceneManager.DebugLog(`Preparing ${this.actions().length.toString()} actions for layer ${this.name()}`);
-    this.actions().filter( action => action.canRun( ) ).forEach( action => action.run() );
-    return this;
-};
-/**
- * @param KunLayerCondition condition
- * @returns KunAnimationLayer
- */
-KunAnimationLayer.prototype.addCondition = function( condition ){
-    if( condition instanceof KunLayerCondition ){
-        this._conditions.push( condition );
-    }
-    return this;
-};
-/**
- * @returns KunLayerCondition[]
- */
-KunAnimationLayer.prototype.conditions = function(){
-    return this._conditions;
-};
-/**
- * @returns Boolean
- */
-KunAnimationLayer.prototype.isUnlocked = function(){
-    if( this.conditions().length ){
-        var notPassed = this.conditions().filter( condition => !condition.validate() );
-        //KunSceneManager.DebugLog( notPassed ? `${this.name()} didn't pass the validation` : `${this.name()} passed the validation!` );
-        return notPassed.length === 0;    
-    }
-    return true;
-};
-/**
- * 
- * @returns 
- */
-KunAnimationLayer.prototype.randomSpot = function(){
-    var list = this.spots(true);
-    return list[Math.floor( Math.random() * list.length)];
-};
-/**
- * @returns Boolean
- */
-KunAnimationLayer.prototype.clearTargetQueue = function( ){
-    return this._clearTargets;
-};
-/**
- * @returns Number
- */
-KunAnimationLayer.prototype.offsetX = function( ){
-    return this._offsetX;
-    if( typeof scale !== 'number'){
-        scale = 1;
-    }
-    return parseInt( this._offsetX * scale );
-};
-/**
- * @returns Number
- */
-KunAnimationLayer.prototype.offsetY = function( ){
-    return this._offsetY;
-    if( typeof scale !== 'number'){
-        scale = 1;
-    }
-    return parseInt( this._offsetY * scale );
-};
-/**
- * @returns Boolean
- */
-KunAnimationLayer.prototype.isInteractive = function(){
-    return this.spots(true).length > 0;
-};
-/**
- * 
- * @param {KunTouchEvent} spot 
- * @returns KunAnimationLayer
- */
-KunAnimationLayer.prototype.registerSpot = function( spot ){
+        this._next = Array.isArray(next) ? next : (typeof next === 'string' && next.length ? [next] : []);
+        this._sounds = Array.isArray(sounds) ? sounds : (typeof sounds === 'string' && sounds.length ? [sounds] : []);
 
-    if( spot instanceof KunTouchEvent && !this._spots.hasOwnProperty(spot.name()) ){
-        //
-        this._spots[spot.name()] = spot;
+        this._conditions = [
+            //KunConditions
+        ];
     }
-
-    return this;
-};
-/**
- * List all spots as array or object ids
- * @param {Boolean} list 
- * @returns Object | KunTouchEvent[]
- */
-KunAnimationLayer.prototype.spots = function( list ){
-    return typeof list === 'boolean' && list ? Object.values( this._spots ) : this._spots;
-}
-/**
- * @param {String} spot 
- * @returns Boolean
- */
-KunAnimationLayer.prototype.hasSpot = function( spot ){
-    return this._spots.hasOwnProperty(spot);
-}
-/**
- * @param {String} spot 
- * @returns KunTouchEvent
- */
-KunAnimationLayer.prototype.getSpot = function( spot ){
-    return this.hasSpot(spot) ? this._spots[spot] : null;
-}
-/**
- * Check if any spot was touched
- * @param {Number} x 
- * @param {Number} y 
- * @returns KunTouchEvent 
- */
-KunAnimationLayer.prototype.touchSpot = function( x , y ){
-    var hotspots = this.spots(true);
-    for( var i in hotspots ){
-        //hotspots[i].test( x , y );
-        if( hotspots[i].touched( x , y ) ){
-            //console.log( `${hotspots[i]} touched on ${x},${y}` );
-            return hotspots[i];
+    /**
+     * @returns {Number[]}
+     */
+    offset() { return this._offset; }
+    /**
+     * List all spots as array or object ids
+     * @param {Boolean} mapname
+     * @returns {KunHotSpot[]}
+     */
+    spots(mapname = false) { return mapname && this._spots.map(s => s.name()) || this._spots; }
+    /**
+     * @param {String} name 
+     * @returns {KunHotSpot}
+     */
+    spot(name = '') { return this.spots().find(spot => spot.name() === name) || null; }
+    /**
+     * @returns {Boolean}
+     */
+    cantouch() { return this.spots().length > 0; };
+    /**
+     * @param {KunHotSpot} spot 
+     * @returns {KunFrameSet}
+     */
+    addspot(spot = null) {
+        if (spot instanceof KunHotSpot && !this.spot(spot.name())) {
+            this.spots().push(spot);
         }
+        return this;
+    };
+    /**
+     * Check if any spot was touched
+     * @param {Number} x 
+     * @param {Number} y 
+     * @returns {KunHotSpot} 
+     */
+    touchSpot(x, y) {
+        const hotspots = this.spots().filter(spot => spot.unlocked() && spot.collide(x, y));
+        return hotspots.length ? hotspots[0] : null;
+    };
+    /**
+     * @returns {String}
+     */
+    behavior() { return this._type; };
+    /**
+     * @param {Number} frame 
+     * @returns {KunFrameSet}
+     */
+    add(frame) {
+        this._frames.push(frame);
+        return this;
+    };
+    /**
+     * @returns {Number}
+     */
+    fps() {
+        return this._fps;
+    };
+    /**
+     * @returns {Number}
+     */
+    loops() {
+        return this._loops;
+    };
+    /**
+     * @returns {Number}
+     */
+    frames() {
+        return this._frames.length > 0 ? this._frames : [0];
     }
-    return null;
-};
-/**
- * @returns String
- */
-KunAnimationLayer.prototype.behavior = function(){
-    return this._type;
-};
-/**
- * @param {Number} frame 
- * @returns KunAnimationLayer
- */
-KunAnimationLayer.prototype.add = function( frame ){
-    this._frames.push( frame );
-    return this;
-};
-/**
- * @returns Number
- */
-KunAnimationLayer.prototype.fps = function(){
-    return this._fps;
-    //return this._fps > 0 ? this._fps : KunSceneManager.defaultFps();
-};
-/**
- * @returns Number
- */
-KunAnimationLayer.prototype.loops = function(){
-    return this._loops;
-};
-/**
- * @returns Number
- */
-KunAnimationLayer.prototype.frames = function( ){
-    return this._frames.length > 0 ? this._frames : [0];
+    /**
+     * @returns {Number}
+     */
+    //first() { return this.frames().length > 0 ? this.frames()[0] : 0; };
+    /**
+     * @param {Number} index 
+     * @returns {Number}
+     */
+    frame(index = 0) {
+        return this._frames.length > index ? this._frames[index] : this._frames[0];
+    };
+    /**
+     * @returns {Number}
+     */
+    count() {
+        return this.frames().length;
+    };
+    /**
+     * @returns {Number}
+     */
+    name() { return this._name; };
+    /**
+     * @returns {String[]}
+     */
+    next() { return this._next; };
+    /**
+     * @param {Boolean} select
+     * @returns {String[]|String}
+     */
+    getNext(select = false) {
+        if (select) {
+            var size = this._next.length;
+            return size ? this._next[Math.floor(Math.random() * size)] : '';
+        }
+        return this._next;
+    }
+    /**
+     * @param {Boolean} select
+     * @returns {String[]|String}
+     */
+    sounds(select = false) {
+        var size = this._sounds.length;
+        if (select) {
+            //always return a string with a select flag!
+            return size ? this._sounds[Math.floor(Math.random() * size)] : '';
+        }
+        return this._sounds;
+    };
+    /**
+     * @param {String} tag 
+     * @returns {KunFrameSet}
+     */
+    tag(tag = '') {
+        if (!this.tagged(tag)) {
+            this.tags().push(tag);
+        }
+        return this;
+    }
+    /**
+     * @param {String} tag 
+     * @returns {Boolean}
+     */
+    tagged(tag = '') { return !!tag && this.tags().includes(tag); }
+    /**
+     * @returns {String[]}
+     */
+    tags() { return this._tags; }
+    /**
+     * @param {KunCondition} condition
+     * @returns {KunFrameSet}
+     */
+    addCondition(condition) {
+        if (condition instanceof KunCondition) {
+            this._conditions.push(condition);
+        }
+        return this;
+    };
+    /**
+     * @param {Boolean} filter
+     * @returns {KunCondition[]}
+     */
+    conditions(filter = false) {
+        return filter ?
+            this._conditions.filter(condition => condition.validate()) :
+            this._conditions;
+    };
+    /**
+     * @returns {Boolean}
+     */
+    unlocked() {
+        return this.conditions(true).length === this.conditions().length;
+    };
+    /**
+     * @param {String} soundpack
+     * @param {Number} soundloop
+     * @param {Number} variance 
+     * @returns {KunFrameLoop}
+     */
+    createLoop(soundpack = '', soundloop = 0, variance = 1) {
+        return new KunFrameLoop(this, soundpack, soundloop, variance);
+    }
 }
 /**
- * @returns Number
+ * 
  */
-KunAnimationLayer.prototype.first = function(){
-    return this.frames().length > 0 ? this.frames()[0] : 0;
-};
-/**
- * @param {Number} index 
- * @returns Number
- */
-KunAnimationLayer.prototype.getFrame = function( index ){
-    return this._frames.length > index ? this._frames[index] : this._frames[0];
-    return this._frames.length > index ? this._frames[index] : 0;
-};
-/**
- * @returns Number
- */
-KunAnimationLayer.prototype.count = function(){
-    return this.frames().length;
-};
-/**
- * @returns Number
- */
-KunAnimationLayer.prototype.name = function(){
-    return this._name;
-};
-/**
- * @returns String[]
- */
-KunAnimationLayer.prototype.next = function(){
-    return this.nextLayers();
-};
-/**
- * @returns String[]
- */
-KunAnimationLayer.prototype.nextLayers = function(){
-    return this._next;
-};
-/**
- * @returns Boolean
- */
-KunAnimationLayer.prototype.hasSoundBank = function(){
-    return this._bank.length > 0;
-};
-/**
- * @param {String} prefix
- * @returns String
- */
-KunAnimationLayer.prototype.selectSoundBank = function( prefix ){
-    if( this.hasSoundBank() ){
-        var selection = this._bank.length > 1 ? Math.floor(Math.random() * this._bank.length) : 0;
-        return typeof prefix === 'string' && prefix.length ? prefix + '-' + this._bank[selection] : this._bank[selection];
+class KunFrameLoop {
+    /**
+     * @param {KunFrameSet} frameset 
+     * @param {String} soundpack
+     * @param {Number} soundloop
+     * @param {Number} variance
+     */
+    constructor(frameset = null, soundpack = '', soundloop = 0, variance = 1) {
+        this._fs = frameset instanceof KunFrameSet && frameset || null;
+        this._soundpack = soundpack || '';
+        this._soundloop = soundloop || 0;
+        this.reset(variance);
     }
-    return '';
-    return this.hasSoundBank() ? ( this._bank.length > 1 ? Math.floor(Math.random() * this._bank.length) : this._bank[0] ) : '';
+    /**
+     * @param {KunFrameSet} frameset 
+     * @returns {KunFrameLoop}
+     */
+    replace(frameset = null) {
+        if (frameset instanceof KunFrameSet) {
+            this._fs = frameset;
+            this.reset();
+        }
+        return this;
+    }
+    /**
+     * @param {Number} variance 
+     * @returns {KunFrameLoop}
+     */
+    reset(variance = 1) {
+        this._loop = 0;
+        this._backwards = false;
+        this._completed = false;
+        this._frame = this.behavior() === KunAnimation.Behavior.Reverse && this.count() - 1 || 0;
+        this._loops = this.ready() && this.frameset().loops() || 0;
+        this.setfps((this.ready() && this.frameset().fps() || this.manager().FPS()) * variance);
+        if( variance ){
+            this._loops *= variance;
+        }
+        //console.log(this,variance);
+        return this;
+    }
+    /**
+     * @returns {KunScenes}
+     */
+    manager() { return KunScenes.manager(); }
+    /**
+     * @returns {KunFrameSet}
+     */
+    frameset() { return this._fs; }
+    /**
+     * @returns {Boolean}
+     */
+    ready() { return !!this.frameset(); }
+    /**
+     * @returns {String}
+     */
+    name() { return this.ready() && this.frameset().name() || '' }
+    /**
+     * @param {String} name 
+     * @returns {Number[]}
+     */
+    offset() { return this.ready() && this.frameset().offset() || [0, 0]; };
+
+    /**
+     * Check if any spot was touched
+     * @param {Number} x 
+     * @param {Number} y 
+     * @returns {KunHotSpot} 
+     */
+    touch(x, y) {
+        const hotspots = this.spots(true).filter(spot => spot.collide(x, y));
+        return hotspots.length ? hotspots[0] : null;
+    };
+    /**
+     * @param {String} target 
+     * @returns {KunHotSpot}
+     */
+    spot(target = '') {
+        return this.ready() && this.frameset().spot(target) || null;
+    }
+    /**
+     * @param {Boolean} unlocked list all unlocked spots
+     * @returns {KunHotSpot[]}
+     */
+    spots(unlocked = false) {
+        const spots = this.ready() && this.frameset().spots() || [];
+        return unlocked && spots.filter(spot => spot.unlocked()) || spots;
+    }
+
+    /**
+     * @param {String} tag 
+     * @returns {Boolean}
+     */
+    tagged(tag = '') { return !!tag && this.frameset().tagged(tag); }
+    /**
+     * @returns {String[]}
+     */
+    tags() { return this.ready() && this.frameset().tags() || [] }
+
+
+    /**
+     * @returns {Boolean}
+     */
+    fps() { return this._fps; }
+    /**
+     * @param {Number} fps 
+     * @returns {KunFrameLoop}
+     */
+    setfps(fps = 0) {
+        this._fps = fps || this.manager().FPS()
+        return this;
+    }
+    /**
+     * @returns {Number}
+     */
+    frame(getindex = false) {
+        return getindex ? this.ready() && this.frameset().frame(this._frame) || 0 : this._frame;
+    }
+    /**
+     * @param {Boolean} map
+     * @returns {Number}
+     */
+    first(map = false) {
+        return map && this.ready() && this.frameset().frames()[0] || 0
+    }
+    /**
+     * @param {Boolean} map
+     * @returns {Number}
+     */
+    last(map = false) {
+        if (map) {
+            return this.ready() && this.frameset().frames()[this.count() - 1] || 0;
+        }
+        return this.count() - 1 || 0;
+    }
+    /**
+     * @returns {String[]}
+     */
+    next() { return this.ready() && this.frameset().next() || []; };
+    /**
+     * @param {Number} loop
+     * @returns {KunFrameLoop}
+     */
+    playAudio() {
+        if (this.ready()) {
+            const sound = this.audioSource(this.frameset().sounds(true));
+            //console.log('Playing sound: ',sound);
+            sound && this.manager().playSound(sound);
+        }
+        return this;
+    };
+    /**
+     * @param {String} sound
+     * @returns {String}
+     */
+    audioSource(sound = '') { return sound && this._soundpack && this._soundpack + '-' + sound || sound; };
+    /**
+     * @returns {Number}
+     */
+    //soundloop(){ return this._soundloop || this.loops() || 4; }
+    soundloop() { return this._soundloop || 4; }
+    /**
+     * @param {Number} loop 
+     * @returns {Boolean}
+     */
+    audioLoop(loop = 0) { return !(loop % this.soundloop()); }
+    /**
+     * @returns {Number}
+     */
+    loops() { return this._loops; }
+    /**
+     * @returns {Number}
+     */
+    count() { return this.ready() && this.frameset().count() || 0; }
+    /**
+     * @returns {Boolean}
+     */
+    infinite() { return !this.loops(); }
+    /**
+     * Frameloop has completed all rounds, allow to jump to other framesets or perform other logics before resetting
+     * @returns {Boolean}
+     */
+    //completed() { return !this.infinite() && this._loop + 1 >= this.loops(); }
+    completed() { return this._completed; }
+    /**
+     * @returns {Boolean}
+     */
+    updateloop() {
+        this.audioLoop(this._loop) && this.playAudio();
+        const loops = this.loops();
+        this._loop = ++this._loop % (loops || 10); //allow count loop on infinite to handle audio sfx
+        return loops && !this._loop || false;
+    }
+    /**
+     * @returns {String}
+     */
+    behavior() { return this.ready() && this.frameset().behavior() || ''; }
+    /**
+     * Update the frame loop following its behaviour, and resets when done
+     * @returns {Number} Current Sprite_Picture rendering frame
+     */
+    update() {
+        if (this._completed) {
+            this._completed = false;
+        }
+        //console.log(`${this.name()} round ${this._loop + 1}: ${this._frame}/${this.count()}`);
+        switch (this.behavior()) {
+            case KunAnimation.Behavior.PingPong:
+                return this.pingpong();
+            case KunAnimation.Behavior.Reverse:
+                return this.backwards();
+            case KunAnimation.Behavior.Forward:
+                return this.forwards();
+            case KunAnimation.Behavior.Static:
+            default: return this.frame(true);
+        }
+    };
+    /**
+     * @returns {Number}
+     */
+    pingpong() {
+        if (this._backwards) {
+            //reverse
+            this._frame = Math.max(--this._frame, 0);
+        }
+        else {
+            if (++this._frame >= this.count() - 1) {
+                this._backwards = true;
+            }
+        }
+        //after complete the round
+        if (this._backwards && this._frame === 0) {
+            this._backwards = false;
+            this._completed = this.updateloop();
+        }
+        return this.frame(true);
+    }
+    /**
+     * @returns {Number}
+     */
+    backwards() {
+        this._frame = Math.max(--this._frame, 0);
+        if (this._frame === 0) {
+            this._frame = this.count() - 1;
+            this._completed = this.updateloop();
+            //loop is finished
+        }
+        return this.frame(true);
+    }
+    /**
+     * @returns {Number}
+     */
+    forwards() {
+        //check this conditiojn first, then update index, also run when index points to last frame.
+        this._frame = ++this._frame % this.count();
+        if (this._frame === 0) {
+            //loop is finished?
+            this._completed = this.updateloop();
+        }
+        return this.frame(true);
+    }
+}
+
+/**
+ * @type {KunAnimation}
+ */
+class KunAnimation {
+    /**
+     * @param {KunScene} scene 
+     * @param {String} alias
+     * @param {Number} pictureid
+     * @param {String} fs
+     * @param {Boolean} autoplay
+     */
+    constructor(scene = null, alias = '', pictureid = 0, autoplay = false, fs = '') {
+
+        this._scene = scene instanceof KunScene ? scene : null;
+        this._frameloop = this.initializeloop(fs);
+
+        this.rename(alias || '');
+        this.setID(pictureid || 0);
+        //Game_Picture for aplying transforms and effects
+        this._picture = null;
+        this._playing = autoplay && this.frameloop().ready() || false;
+        this._elapsed = 0;
+        //this one can be overriden
+        this._variant = 0;
+        //custom playlist, stages and var mapping animations
+        this._playlist = [];
+        this._stages = {};
+        this._mapvar = 0;
+        this.setMode(this.scene() && this.scene().mode() || KunAnimation.Mode.Default);
+        this.reset();
+    }
+    /**
+     * @param {String} frameset 
+     * @returns {KunFrameLoop}
+     */
+    initializeloop(frameset = '') {
+        const fs = this.get(frameset) || this.first() || new KunFrameLoop();
+        return fs.createLoop(
+            this.scene().soundProfile(),
+            this.scene().soundLoop()
+        );
+    }
+    /**
+     * @returns {String}
+     */
+    toString() { return `${this.name()} (${this.alias()}) - ${this.ID()}`; }
+    /**
+     * @returns {KunScenes}
+     */
+    manager() { return KunScenes.manager(); }
+    /**
+     * @param {Boolean} asValue
+     * @returns {Number}
+     */
+    mapvar(asValue = false) {
+        return asValue ? this._mapvar && $gameVariables.value(this._mapvar) || 0 : this._mapvar;
+    }
+    /**
+     * @param {Number} gameVar 
+     * @returns {KunAnimation}
+     */
+    setVarMap(gameVar = 0) {
+        this._mapvar = gameVar || 0
+        return this;
+    }
+    /**
+     * @param {String} mode 
+     * @returns {KunAnimation}
+     */
+    setMode(mode = KunAction.Mode.Default) {
+        this._mode = mode;
+        return this;
+    }
+    /**
+     * @returns {String}
+     */
+    mode() { return this._mode === KunAnimation.Mode.Default && this.scene().mode() || this._mode; };
+    /**
+     * @returns {Boolean}
+     */
+    canplayback() { return this.mode() === KunAnimation.Mode.PlayBack; };
+    /**
+     * @returns {Boolean}
+     */
+    cantouch() { return this instanceof KunInteractiveAnimation && this.mode() === KunAnimation.Mode.Touch; };
+    /**
+     * @returns {Boolean}
+     */
+    canremove() { return this.mode() === KunAnimation.Mode.Remove; }
+    /**
+     * @param {Boolean} remove
+     * @returns {KunAnimation}
+     */
+    mark4Remove(remove = false) {
+        this.setMode(KunAnimation.Mode.Remove);
+        remove && this.picture().remove();
+        return this;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    cananimate() {
+        return ![
+            KunAnimation.Mode.Disabled,
+            KunAnimation.Mode.Static,
+        ].includes(this.mode());
+    }
+    /**
+     * @returns {Boolean}
+     */
+    canmove() { return this instanceof KunMovingAnimation; }
+
+    /**
+     * @param {Boolean} list 
+     * @returns {String[]|Object}
+     */
+    stages(list = false) { return list ? Object.keys(this._stages) : this._stages; };
+    /**
+     * @param {String} stage 
+     * @param {String} picture 
+     * @returns {KunScene}
+     */
+    addStage(stage = '', picture = '') {
+        if (stage && !this.stages().hasOwnProperty(stage) && this.manager().has(picture)) {
+            this.stages()[stage] = picture;
+        }
+        return this;
+    };
+    /**
+     * @param {String} name 
+     * @param {String} stage 
+     * @returns {Boolean}
+     */
+    changeStage(stage = '', reset = false) {
+        const picture = this.stages()[stage];
+        if (!!picture) {
+            const animation = !reset && this.frameloop().name() || '';
+            const scene = this.manager().scene(picture);
+            if (scene) {
+                this._scene = scene;
+                KunScenes.DebugLog(`Replacing stage for ${this.name()} to ${this.scene().name()} ...`);
+                this.picture().replace(this.scene().name());
+                //this.manager().replacePicture(this.ID(), picture);
+                this.play(animation || this.first().name());
+                return true;
+            }
+        }
+        return false;
+    };
+    /**
+     * check if the picture has been replaced within the update loop (same way as the Sprite_Picture list)
+     * @param {Sprite_Picture} picture 
+     * @returns {KunAnimation}
+     */
+    hasChanged(picture = null) {
+        if (picture instanceof Sprite_Picture) {
+            if (this.name() !== picture._pictureName) {
+                this.changePicture(picture);
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * @param {Sprite_Picture} picture 
+     * @returns {KunAnimation}
+     */
+    changePicture(picture = null) {
+        if (picture instanceof Sprite_Picture) {
+            const name = picture._pictureName;
+            if (this.isme(name)) {
+                return this;
+            }
+            this._id = picture._pictureId;
+            //prepare to replace scene
+            const scene = KunScenes.manager().scene(name);
+            if (scene) {
+                this._scene = scene;
+                this.play(this.first().name());
+                return this;
+            }
+        }
+        //give back null to the failed animation reload
+        return null;
+    }
+    /**
+     * @param {Boolean} list 
+     * @returns {String[]}
+     */
+    labels(list = false) {
+        return this.manager().labels(list);
+    }
+    /**
+     * @returns {Object}
+     */
+    mapAnimationLabels() {
+        const labels = {};
+        this.animations()
+            .map(a => a.name())
+            .forEach(animation => labels[animation] = this.labels().hasOwnProperty(animation) ? this.labels()[animation] : animation);
+        return labels;
+    }
+    /**
+     * @returns {Object}
+     */
+    mapSpotLabels() {
+        const labels = {};
+        //const spots = this.frameset() && this.frameset().spots(true) || [];
+        const spots = this.frameloop().spots(true);
+        spots.map(spot => spot.name())
+            .forEach(spot => labels[spot] = this.labels().hasOwnProperty(spot) ? this.labels()[spot] : spot);
+        return labels;
+    };
+    /**
+     * @returns {Object}
+     */
+    mapStages() {
+        const labels = {};
+        this.stages(true).forEach(stage => labels[stage] = this.labels().hasOwnProperty(stage) ? this.labels()[stage] : stage);
+        return labels;
+    };
+    /**
+     * @param {String} type 
+     * @returns {Object}
+     */
+    mapMenu(type = 'spot') {
+        switch (type) {
+            case 'stage':
+                return this.mapStages();
+            case 'animation':
+                return this.mapAnimationLabels();
+            case 'touch':
+            case 'capture':
+            default:
+                return this.mapSpotLabels();
+        }
+    };
+    /**
+     * @param {String} tag 
+     * @returns {KunAnimation}
+     */
+    runActions(tag = '') {
+        if (this.scene()) {
+            this.scene().runActions(tag);
+        }
+        return this;
+    };
+    /**
+     * @param {String} animation 
+     * @returns {KunAnimation}
+     */
+    push(animation) {
+        this._playlist.push(animation);
+        return this;
+    };
+    /**
+     * @returns {KunAnimation}
+     */
+    clear(animation = '') {
+        this._playlist = animation ? this._playlist.filter(a => a !== animation) : [];
+        return this;
+    };
+    /**
+     * @returns {String[] }
+     */
+    playlist() { return this._playlist; };
+    /**
+     * @returns {Number}
+     */
+    rows() { return this.scene() && this.scene().rows() || 0; };
+    /**
+     * @returns {Number}
+     */
+    cols() { return this.scene() && this.scene().cols() || 0; };
+    /**
+     * @param {String} name 
+     * @returns {Number[]}
+     */
+    offset() { return this.frameloop().offset(); };
+    /**
+     * @param {String} name
+     * @returns {KunAnimation}
+     */
+    play(name = '') {
+        name && this.frameloop().replace(this.get(name, true));
+        this._playing = this.frameloop().ready();
+        return this;
+    }
+    /**
+     * @param {String} tag
+     * @param {Boolean} random 
+     * @returns {Boolean}
+     */
+    playTag(tag = '', random = false) {
+        if (tag) {
+            const list = this.animations().filter(fs => fs.tagged(tag));
+            if (list.length) {
+                const fs = random && list[Math.floor(Math.random() * list.length)] || list[0];
+                this.frameloop().replace(fs);
+                KunScenes.DebugLog(`Playing animation ${this.name()} by tag ${tag} ( ${this.frameloop().name()} selected)`);
+                this.reset();
+                return true;
+            }
+        }
+        this._playing = this.frameloop().ready();
+        return false;
+    }
+    /**
+     * @returns {KunAnimation}
+     */
+    playMap() {
+        if (this.mapvar() && this.playlist().length) {
+            const selected = this.mapvar(true) % this.playlist().length;
+            this.play(this.playlist()[selected]);
+        }
+        return this;
+    }
+    /**
+     * @returns {KunAnimation}
+     */
+    stop() {
+        this._playing = false;
+        return this;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    playing() {
+        //return this._playing && this.ready() && this.cananimate();
+        return this._playing && this.ready();
+    };
+    /**
+     * @returns {Number}
+     */
+    ID() { return this._id; };
+    /**
+     * @returns {Boolean}
+     */
+    noid() { return !this.ID(); }
+    /**
+     * @return {KunAnimation}
+     */
+    setID(pictureid = 0) {
+        this._id = pictureid || 0;
+        return this;
+    };
+    /**
+     * @returns {String}
+     */
+    name() { return this.scene() && this.scene().name() || ''; };
+    /**
+     * @returns {String}
+     */
+    fullname() { return `${this.name()}-${this.ID()}`; }
+    /**
+     * @returns {String}
+     */
+    alias() { return this._name; };
+    /**
+     * @returns {Boolean}
+     */
+    noalias() { return !this.alias(); }
+    /**
+     * @param {String} name 
+     * @returns {KunAnimation}
+     */
+    rename(name = '') {
+        this._name = name || '';
+        return this;
+    };
+    /**
+     * @param {String} name 
+     * @param {Number} id
+     * @returns {Boolean}
+     */
+    isme(name = '', id = 0) {
+        return name && (this.alias() === name || this.name() === name) && (id === 0 || id === this.ID());
+    }
+    /**
+     * @returns {Number}
+     */
+    fps() { return this.frameloop().fps() };
+    /**
+     * @param {Number} fps
+     * @returns {KunAnimation} 
+     */
+    setFps(fps = 0) {
+        this.frameloop().setfps(fps);
+        return this;
+    };
+    /**
+     * @returns {Boolean}
+     */
+    ready() {
+        return this.scene() !== null;
+    }
+    /**
+     * @returns {KunScene}
+     */
+    scene() { return this._scene; };
+    /**
+     * @returns {KunPicture}
+     */
+    picture() {
+        return this._picture || (this._picture = new KunPicture(this.name(), this.ID()));
+    };
+    /**
+     * @returns {Number[]}
+     */
+    position() { return this.picture().position() }
+    /**
+     * @param {String} picture 
+     * @returns {Boolean}
+     */
+    replaceby(picture = '', frameset = '') {
+        if (this.manager().has(picture)) {
+            this._scene = this.manager().scene(picture);
+            const fs = this.initializeloop(frameset);
+            this._frameloop = fs.createLoop();
+            this.reset();
+            return true;
+        }
+        return false;
+    }
+    /**
+     * @param {String} filter
+     * @return {KunFrameSet[]}
+     */
+    animations(filter = '') {
+        return this.ready() ? filter && this.scene().framesets().filter(fs => fs.name() === filter) || this.scene().framesets() : [];
+    }
+    /**
+     * @returns {KunFrameSet}
+     */
+    first() { return this.animations()[0] || null; };
+    /**
+     * @param {String} name 
+     * @param {Boolean} random
+     * @returns {KunFrameSet}
+     */
+    get(name = '', random = false) {
+        const list = this.animations(name);
+        return list.length ? random && list[Math.floor(Math.random() * list.length)] || list[0] : null;
+    };
+    /**
+     * @param {String[]} animation
+     * @returns {Boolean}
+     */
+    select(list = []) {
+        const animations = list.length ? this.animations().filter(a => list.includes(a.name()) && a.unlocked()).map(a => a.name()) : [];
+        const selected = animations.length ? animations[Math.floor(Math.random() * animations.length)] : '';
+        if (selected) {
+            this.play(selected);
+            return true;
+        }
+        return false;
+    };
+    /**
+     * @returns {KunFrameLoop}
+     */
+    frameloop() { return this._frameloop || null; };
+    /**
+     * @returns {String}
+     */
+    current() { return this.frameloop().name() || ''; }
+    /**
+     * @param {Number} variant 
+     * @returns {KunAnimation}
+     */
+    setVariant(variant = 0) {
+        this._variant = variant;
+        return this;
+    };
+    /**
+     * @returns {Boolean}
+     */
+    tick() {
+        this._elapsed = ++this._elapsed % this.fps();
+        return this._elapsed === 0;
+    };
+    /**
+     * @param {Boolean } stop
+     * @returns {KunAnimation}
+     */
+    reset(stop = false) {
+        this.frameloop().reset(this._variant);
+        stop && this.stop();
+        return this;
+    }
+    /**
+     * @param {Sprite_Picture} picture 
+     * @returns {Boolean}
+     */
+    update(picture = null) {
+        if (this.playing()) {
+            if (this.tick()) {
+                //console.log(this.fullname(), picture);
+                return this.updateanimation(picture);
+            }
+        }
+        return false;
+    }
+    /**
+     * @param {Sprite_Picture} picture 
+     * @returns {Boolean}
+     */
+    updateanimation(picture = null) {
+        if (!this.hasChanged(picture)) {
+            this.frameloop().update();
+            if (this.frameloop().completed()) {
+                //select next frameset in the queue
+                this.select(this.canplayback() && this.playlist() || this.frameloop().next());
+            }
+            return this.drawframe(picture);
+        }
+        return false;
+    }
+    /**
+     * @param {Sprite_Picture} picture 
+     */
+    drawframe(picture = null) {
+        const bitmap = picture instanceof Sprite_Picture && picture.bitmap || null;
+        if (picture && bitmap) {
+            const index = this.frameloop().frame(true);
+            const width = bitmap.width / this.cols();
+            const height = bitmap.height / this.rows();
+            const x = index % this.cols() * width;
+            const y = Math.floor(index / this.cols()) * height;
+            picture.setFrame(x, y, width, height);
+            return true;
+        }
+        return false;
+    }
+}
+
+/**
+ * 
+ */
+class KunInteractiveAnimation extends KunAnimation {
+    /**
+     * @param {KunScene} scene 
+     * @param {String} animation 
+     * @param {Boolean} autoplay 
+     * @param {Number} pictureId 
+     * @param {String} alias 
+     */
+    constructor(scene = null, alias = '', pictureid = 0, autoplay = false, animation = '') {
+        super(scene, alias || '', pictureid || 0, autoplay || false, animation || '');
+        this._input = null;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    accurate() { return this.manager().accurateSpots(); }
+
+    /**
+     * @returns {KunTouchInput}
+     */
+    input() { return this._input; }
+    /**
+     * @param {String} mode 
+     * @returns {KunInteractiveAnimation}
+     */
+    setMode(mode = KunAnimation.Mode.Default) {
+        super.setMode(mode);
+        this._input = this.cantouch() && new KunTouchInput() || null;
+        return this;
+    }
+
+    /**
+     * @param {Sprite_Picture} picture 
+     * @returns {Boolean}
+     */
+    update(picture = null) {
+        this.cantouch() && this.updateinput(picture);
+        return super.update(picture);
+    }
+
+    /**
+     * @param {Sprite_Picture} sprite 
+     * @returns {Boolean}
+     */
+    updateinput(sprite = null) {
+        const input = this.input();
+        if (sprite instanceof Sprite_Picture && input && input.update()) {
+            switch (true) {
+                case input.get('back'):
+                    this.manager().targets().drop();
+                    return true;
+                case input.get('touch'):
+                    //spread touched input and offset input coordinates
+                    const spot = input.spot();
+                    const offset = this.picture().offset(...spot);
+                    this.target(this.touch(...offset), spot[0], spot[1], true);
+                    return true;
+                case input.get('cancel'):
+                    input.clear();
+                    return true;
+            }
+        }
+        return false;
+    }
+
+
+    /**
+     * @param {KunHotSpot} spot 
+     * @param {Number} x 
+     * @param {Number} y 
+     * @param {Boolean} playse
+     * @returns {KunAnimation}
+     */
+    target(spot, x, y, playse = false) {
+        if (spot instanceof KunHotSpot) {
+            playse && spot.touchse();
+            switch (spot.trigger()) {
+                case KunHotSpot.Trigger.Queue:
+                    this.manager().targets().add(new KunTarget(spot, this.name(), x, y, this.ID()));
+                    break;
+                case KunHotSpot.Trigger.Instant:
+                    spot.runActions();
+                    this.select(spot.next());
+                    break;
+                case KunHotSpot.Trigger.Frame:
+                    var frame = this.frameloop().frame();
+                    spot.actions().forEach(action => action.set(frame));
+                    break;
+                case KunHotSpot.Trigger.NextFrame:
+                    this.select(spot.next());
+                    const first = this.frameloop().first(true);
+                    spot.actions().forEach(action => action.set(first));
+                    break;
+            }
+        }
+        return this;
+    };
+    /**
+     * List all tagged spots using inclusive/exclusive filters
+     * @param {String} tag Get all spots tagged with tag
+     * @param {Boolean} exclusive get all spots not tagged with tag
+     * @returns {String}
+     */
+    tagspots(tag = '', exclusive = false) {
+        return this.frameloop().spots()
+            .filter(spot => exclusive && !spot.tags().includes(tag) || spot.tags().includes(tag))
+            .map(spot => spot.name());
+    }
+    /**
+     * @returns {String[]}
+     */
+    spots() { return this.frameloop().spots().map(spot => spot.name()) }
+    /**
+     * @param {String} target
+     * @param {Boolean} touch
+     * @param {Boolean} filterLocked
+     * @returns {KunAnimation}
+     */
+    capture(target = '', touch = false, filterLocked = false) {
+        const _manager = this.manager();
+        const spot = target && this.spot(target) || this.randomSpot(filterLocked);
+        if (spot instanceof KunHotSpot) {
+            const accurate = this.accurate();
+            const x = accurate ? spot.midx() : spot.x(true);
+            const y = accurate ? spot.midy() : spot.y(true);
+            const position = _manager.picturePosition(this.name(), x, y);
+
+            //console.log(`${this.name()}: ${position.x},${position.y} [${spot.tags().join()}]`);
+            KunScenes.DebugLog(`${this.name()}: ${position.x},${position.y} [${this.frameloop().tags().join()}]`);
+            if (touch) {
+                this.target(spot, position.x, position.y);
+            }
+            else {
+                //_manager.setPosition(position.x, position.y);
+            }
+        }
+        return this;
+    };
+
+    /**
+     * @param {Number} x 
+     * @param {Number} y 
+     * @returns {KunHotSpot}
+     */
+    touch(x, y) { return this.cantouch() && this.frameloop().touch(x, y) || null; };
+    /**
+     * @param {Boolean} unlocked
+     * @returns {KunHotSpot}
+     */
+    randomSpot(unlocked = false) {
+        const spots = this.spots(unlocked);
+        return spots.length ? spots[Math.floor(Math.random() * spots.length)] : null;
+    };
+    /**
+     * @param {String} target 
+     * @returns {KunHotSpot}
+     */
+    spot(target = '') { return this.frameloop().spot(target) }
+    /**
+     * @param {Boolean} unlocked
+     * @returns {KunHotSpot[]}
+     */
+    spots(unlocked = false) { return this.frameloop().spots(unlocked); }
+}
+
+
+/**
+ * Use for dynamic moving animations such as cursors or transition pictures
+ */
+class KunMovingAnimation extends KunAnimation {
+    /**
+     * @param {KunScene} scene 
+     * @param {String} animation 
+     * @param {Boolean} autoplay 
+     * @param {Number} pictureId 
+     * @param {String} alias 
+     */
+    constructor(scene = null, alias = '', pictureid = 0, autoplay = false, animation = '') {
+
+        super(scene, alias, pictureid, autoplay, animation);
+        //disable touch by default
+        //this.setMode(KunAnimation.Mode.Moving);
+        //move these fromthe base class to the pathpoint
+        //this._locations = [];
+        //this._fixed = [0, 0];
+        this._target = null;
+
+        this._fixed = [0, 0];
+        this._pathpoint = '';
+        this.clearpaths();
+    }
+
+    //DYNAMIC MOVING EFFECTS
+
+    /**
+     * @param {KunTarget} target 
+     * @returns {KunAnimation}
+     */
+    saveTarget(target = null) {
+        this._target = target instanceof KunTarget && target || null;
+        return this;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    hasTarget() { return !!this._target; }
+
+    /**
+     * @param {Number} x 
+     * @param {Number} y 
+     * @returns {KunAnimation}
+     */
+    fix(x = 0, y = 0) {
+        this._fixed[0] = x || 0;
+        this._fixed[1] = y || 0;
+        return this;
+    }
+
+
+    /**
+     * @param {Number} variant
+     * @returns {Number}
+     */
+    speed(variant = 1) { return Math.round(this.fps() * variant / 100); }
+
+    /**
+     * When this animation has an ID to refer the animated Game_Picture,
+     * it will move it to the refered position, aplying the current frameset offset
+     * @param {Number} x 
+     * @param {Number} y 
+     * @param {Number} duration
+     * @returns {Boolean}
+     */
+    moveto(x = 0, y = 0, duration = 0) {
+        const picture = this.picture().gamePicture();
+        const speed = duration && this.speed(duration) || this.fps();
+        if (picture) {
+            const offset = this.offset();
+            const fixed = this._fixed;
+            const scale = [picture.scaleX(), picture.scaleY()];
+            //allow fix override to pin an animation in x, y or both coordinates
+            const position = [x, y].map((pos, i) => fixed[i] || pos - Math.floor(offset[i] * (scale[i] / 100)));
+            picture.move(picture.origin(),
+                position[0], position[1], scale[0], scale[1],
+                picture.opacity(), picture.blendMode(),
+                speed
+            );
+            return true;
+        }
+        return false;
+    }
+    /**
+     * Play moving animations by the given playlist
+     * @param {KunTarget} target 
+     * @param {Number} duration 
+     * @param {String} idle
+     * @returns {Boolean}
+     */
+    maptarget(target = null, duration = 0, idle = '') {
+        if (target instanceof KunTarget) {
+            if (this.playMap()) {
+                //console.log(`${this.name()} playing mapped animation ${this.frameloop().name()}`);
+                this.followtarget(target.execute(), duration);
+                return true;
+            }
+        }
+        //console.log(`${this.name()} found no target to spot. Looking for idles ...`);
+        this.followtarget();
+        if (idle) {
+            //console.log(`${this.name()} playing idle animation ${idle}`);
+            this.play(idle);
+            this.movetopath(idle, duration || this.fps());
+        }
+        return false;
+    }
+    /**
+     * Play moving animations by the given spot tags
+     * @param {KunTarget} target 
+     * @param {Number} duration 
+     * @param {String} idle 
+     * @returns {Boolean}
+     */
+    tagtarget(target = null, duration = 0, idle = '') {
+        if (target instanceof KunTarget) {
+            const tag = target.tag();
+            if (this.playTag(tag, true)) {
+                //console.log(`${this.name()} tagged ${tag} for target ${target.name()}`);
+                this.followtarget(target.execute(), duration);
+                return true;
+            }
+        }
+        //console.log(`${this.name()} found no target to spot. Looking for idles ...`);
+        this.followtarget(); //clear saved target
+        if (idle) {
+            //console.log(`${this.name()} playing idle animation ${idle}`);
+            this.play(idle);
+            this.movetopath(idle, duration || this.fps());
+        }
+        return false;
+    }
+    /**
+     * @param {KunTarget} target 
+     * @param {Number} duration 
+     * @returns {KunAnimation}
+     */
+    followtarget(target = null, duration = 0) {
+        if (target instanceof KunTarget) {
+            this.saveTarget(target); //save target
+            this.moveto(target.x(), target.y(), duration);
+        }
+        else {
+            this.saveTarget();
+        }
+        return this;
+    }
+
+    /**
+     * @param {Number} duration
+     * @returns {KunAnimation}
+     */
+    movetoIdle(duration = 0) {
+        const pos = this._pathpoint('idle');
+        if (pos) {
+            //change to idle animation before moving
+            this.play(this.first().name());
+            //new version
+            this.moveto(pos.x, pos.y, duration);
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @returns {Object[]}
+     */
+    pathdata() { return this._pathdata; }
+    /**
+     * @returns {KunMovingAnimation}
+     */
+    clearpaths() {
+        this._pathdata = [];
+        return this;
+    }
+    /**
+     * @param {String} name 
+     * @returns {Boolean}
+     */
+    haspath(name = '') { return this.pathdata().some(path => path.name === name); }
+    /**
+     * @param {String} name 
+     * @returns {Object } {x ,y}
+     */
+    pathpoint(name = '') {
+        if (name) {
+            const paths = this.pathdata().filter(path => path.name === name);
+            return paths.length && paths[Math.floor(Math.random() * paths.length)] || null;
+        }
+        return null;
+    }
+    /**
+     * @returns {Object}
+     */
+    pathcurrent() { return this.pathpoint(this._pathpoint); }
+    /**
+     * @param {String} path 
+     * @param {Number} X 
+     * @param {Number} Y 
+     * @returns {KunMovingAnimation}
+     */
+    addpath(path = 'path', X = 0, Y = 0) {
+        if (path) {
+            this.pathdata().push({ name: path, x: X, y: Y });
+        }
+        return this;
+    }
+    /**
+     * @returns {String[]}
+     */
+    pathroute() { return this.pathdata().map(path => path.name); }
+    /**
+     * @returns {String}
+     */
+    pathstart() { return this.pathroute()[0] || '' }
+    /**
+     * @returns {String}
+     */
+    pathend() {
+        const route = this.pathroute();
+        return route.length && route[route.length - 1] || '';
+    }
+    /**
+     * @returns {String}
+     */
+    pathrandom() {
+        const route = this.pathroute();
+        return route.length && route[Math.floor(Math.random() * route.length)] || '';
+    }
+    /**
+     * 
+     * @param {String} path 
+     * @returns {Object} x,y
+     */
+    pathto(path = '') {
+        if (this.haspath(path)) {
+            const route = this.pathroute();
+            const target = route.indexOf(path);
+            const current = route.indexOf(this._pathpoint);
+            if (target > current) {
+                this._pathpoint = route[current + 1];
+            }
+            else if (target < current) {
+                this._pathpoint = route[current - 1];
+            }
+        }
+        return this.pathcurrent();
+    }
+    /**
+     * @param {String} path 
+     * @param {Number} duration
+     * @returns {Boolean}
+     */
+    movetopath(path = '', duration = 0) {
+        path = path.toLowerCase();
+        if (this.haspath(path)) {
+            this._pathpoint = path;
+            const point = this.pathcurrent();
+            return !!point && this.moveto(point.x || 0, point.y || 0, duration);
+        }
+        return false;
+    }
+}
+
+
+/**
+ * @returns {KunAnimation.Mode}
+ */
+KunAnimation.Mode = {
+    Default: 'deafult',
+    Animation: 'animation',
+    Touch: 'touch',
+    Capture: 'capture',
+    PlayBack: 'playback',
+    Moving: 'move',
+    //use these to filter
+    Disabled: 'disabled',
+    Static: 'static',
+    Remove: 'remove',
 };
 /**
- * @param {String} prefix
- * @param {Number} round
- * @returns KunAnimationLayer
+ * @type {KunAnimation.Behavior}
  */
-KunAnimationLayer.prototype.playBank = function( prefix , round ){
-    KunSceneManager.playBank( this.selectSoundBank( prefix ) , round );
-    return this;
+KunAnimation.Behavior = {
+    Forward: 'forward',
+    Reverse: 'reverse',
+    PingPong: 'ping-pong',
+    Static: 'static',
 };
-/**
- * @returns KunAnimationLayer
- */
-/*KunAnimationLayer.prototype.getSoundBank = function( ){
-    return KunSceneManager.soundBank( this.selectSoundBank() );
-};*/
+
+
+
 
 /**
  * 
@@ -2046,606 +3251,2264 @@ KunAnimationLayer.prototype.playBank = function( prefix , round ){
  * @param {Number} y1 
  * @param {Number} x2 
  * @param {Number} y2 
- * @param {Number} varId
- * @param {String} behavior
- * @param {String} sfx
+ * @param {String} trigger
  * @param {String} next
+ * @param {String} sfx
  */
-function KunTouchEvent( name , x1 , y1 , x2 , y2 , varId , amount , behavior, trigger, sfx , next  ){
+class KunHotSpot {
+    constructor(name = '', x1 = 0, y1 = 0, x2 = 0, y2 = 0, trigger = '', next = [], se = '') {
+        this._name = name || KunHotSpot.name;
 
-    this._name = name;
-    this._x1 = parseInt( x1 );
-    this._y1 = parseInt(y1);
-    this._x2 = parseInt(x2);
-    this._y2 = parseInt(y2);
-    this._varId = parseInt(varId || 0 );
-    this._amount = typeof amount === 'number' && amount > 0 ? amount : 1;
-    this._behavior = typeof behavior === 'string' && behavior.length ? behavior : KunTouchEvent.Behaviour.Add;
-    this._trigger = typeof trigger === 'string' && trigger.length ? trigger : KunTouchEvent.Trigger.Queue;
-    this._sfx = sfx || '';
-    this._next = next || [];
+        this._left = x1 > x2 && x2 || x1;
+        this._top = y1 > y2 && y2 || y1;
+        this._right = x2 > x1 && x2 || x1;
+        this._bottom = y2 > y1 && y2 || y1;
 
-    this._hotspot = null;
-}
-/**
- * @returns String
- */
-KunTouchEvent.prototype.toString = function(){
-    return `${this.name()} (${this._x1} ${this._y1} ${this._x2} ${this._y2})`;
-}
-/**
- * @returns String
- */
-KunTouchEvent.prototype.name = function(){
-    return this._name;
-};
-/**
- * @returns Object {x,y} coordinates of the selected spot
- */
-KunTouchEvent.prototype.generatePosition = function(){
-    var x = Math.floor(Math.random() * (this._x2 - this._x1)) + this._x1;
-    var y = Math.floor(Math.random() * (this._y2 - this._y1)) + this._y1;
-    return {
-        'x':x,
-        'y':y,
+        this._trigger = trigger || KunHotSpot.Trigger.Instant;
+        this._se = se || '';
+        this._next = Array.isArray(next) && next || [];
+
+        this._tags = [
+            //Tags
+        ];
+        this._conditions = [
+            //KunCondions
+        ];
+        this._actions = [
+            //KunActions
+        ];
+    }
+    /**
+     * @returns {String}
+     */
+    toString() {
+        return this.name();
+    }
+    /**
+     * @returns {String}
+     */
+    name() {
+        return this._name;
     };
-};
-/**
- * @returns String[]
- */
-KunTouchEvent.prototype.nextLayers = function(){
-    return this._next;
-};
-/**
- * @returns String
- */
-KunTouchEvent.prototype.next = function(){
-    var jumpTo = this._next.length > 1 ? Math.floor( Math.random() * this._next.length) : 0;
-    return this._next.length > 0 ? this._next[ jumpTo ] : '';
-};
-/**
- * @returns Number
- */
-KunTouchEvent.prototype.amount = function(){
-    return this._amount;
-};
-/**
- * @returns String
- */
-KunTouchEvent.prototype.behavior = function(){
-    return this._behavior;
-};
-/**
- * @returns String
- */
-KunTouchEvent.prototype.trigger = function(){
-    return this._trigger;
-};
-/**
- * @returns KunTouchEvent
- */
-KunTouchEvent.prototype.touchSfx = function(){
-    if( this._sfx.length ){
-        KunSceneManager.PlayFX( this._sfx );
+
+    /**
+     * @returns {Number}
+     */
+    left() {
+        return this._left;
     }
-    return this;
-}
-KunTouchEvent.prototype.setValue = function( value ){
-    if( this._varId > 0 ){
-        $gameVariables.setValue( this._varId , value );
+    /**
+     * @returns {Number}
+     */
+    right() {
+        return this._right
     }
-    return this;
-};
-/**
- * @returns KunTouchEvent
- */
-KunTouchEvent.prototype.update = function(){
-    if( this._varId > 0 ){
-        switch( this.behavior()){
-            case KunTouchEvent.Behaviour.Add:
-            case KunTouchEvent.Behaviour.Increase: //deprecated
-                this.setValue( $gameVariables.value(this._varId) + this.amount() );
-                break;
-            case KunTouchEvent.Behaviour.Substract:
-                var amount = $gameVariables.value(this._varId) - this._amount();
-                this.setValue( amount > 0 ? amount : 0 );
-                break;
-            case KunTouchEvent.Behaviour.Set:
-                this.setValue( this.amount() );
-                break;
-            //case KunTouchEvent.Behaviour.Frame:
-                //this.setValue( $gameVariables.value(this._varId) + 1 );
-            //    break;
+    /**
+     * @returns {Number}
+     */
+    top() {
+        return this._top;
+    }
+    /**
+     * @returns {Number}
+     */
+    bottom() {
+        return this._bottom;
+    }
+    /**
+     * @param {Boolean}
+     * @returns {Number}
+     */
+    x(random = false) {
+        return random ? this.left() + Math.floor(Math.random() * this.width()) : this.left();
+    };
+    /**
+     * @param {Boolean}
+     * @returns {Number}
+     */
+    y(random = false) {
+        return random ? this.top() + Math.floor(Math.random() * this.height()) : this.top();
+    };
+    /**
+     * @returns {Number}
+     */
+    midx() { return this.x() + this.width() / 2; }
+    /**
+     * @returns {Number}
+     */
+    midy() { return this.y() + this.height() / 2; }
+    /**
+     * @returns {Number}
+     */
+    width() { return this.right() - this.left(); }
+    /**
+     * @returns {Number}
+     */
+    height() { return this.bottom() - this.top(); }
+
+    /**
+     * @returns {String[]}
+     */
+    next() { return this._next; };
+    /**
+     * @returns Number
+     */
+    amount() { return this._amount; };
+    /**
+     * @returns {String}
+     */
+    trigger() { return this._trigger; };
+    /**
+     * @returns {KunHotSpot}
+     */
+    touchse() {
+        const manager = KunScenes.manager();
+        if (this._se.length) {
+            manager.playse(this._se);
         }
+        else {
+            manager.playse(manager.sfx());
+        }
+        return this;
     }
-    return this;
+    setValue(value) {
+        if (this._varId > 0) {
+            $gameVariables.setValue(this._varId, value);
+        }
+        return this;
+    };
+    /**
+     * @deprecated Use runActions instead
+     * @returns {KunHotSpot}
+     */
+    update() { return this.runActions(); };
+    /**
+     * 
+     * @param {Number} x 
+     * @param {Number} y 
+     * @returns 
+     */
+    collide(x = 0, y = 0) {
+        return this.left() <= x && this.right() >= x && this.top() <= y && this.bottom() >= y;
+    };
+    /**
+     * @param {Number} x 
+     * @param {Number} y 
+     * @returns {Boolean}
+     */
+    canCollide(x = 0, y = 0) { return this.unlocked() && this.collide(x, y); }
+    /**
+     * @returns {Number[]}
+     */
+    area() { return [this.left(), this.top(), this.right(), this.bottom()]; };
+    /**
+     * 
+     * @param {Number} x 
+     * @param {Number} y 
+     * @returns {KunHotSpot}
+     */
+    test(x, y) {
+        KunScenes.DebugLog(`${this.name()} X(${this.left()} >= ${x} <= ${this.right()}) Y(${this.top()} >= ${y} <= ${this.bottom()})`);
+        return this;
+    };
+    /**
+     * @returns {String[]}
+     */
+    tags() { return this._tags; }
+    /**
+     * @param {String} tag 
+     * @returns {Boolean}
+     */
+    hasTag(tag = '') { return tag && this.tags().includes(tag); }
+    /**
+     * @param {String} tag 
+     * @returns {KunHotSpot}
+     */
+    tag(tag = '') {
+        if (!this.hasTag(tag)) {
+            this._tags.push(tag);
+        }
+        return this;
+    }
+    /**
+     * @param {KunCondition} condition
+     * @returns {KunHotSpot}
+     */
+    addCondition(condition) {
+        if (condition instanceof KunCondition) {
+            this._conditions.push(condition);
+        }
+        return this;
+    };
+    /**
+     * @param {Boolean} filter
+     * @returns {KunCondition[]}
+     */
+    conditions(filter = false) {
+        return typeof filter === 'boolean' && filter ?
+            this._conditions.filter(condition => condition.validate()) :
+            this._conditions;
+    };
+    /**
+     * @returns {Boolean}
+     */
+    unlocked() {
+        return this.conditions(true).length === this.conditions().length;
+    };
+    /**
+     * @param {KunAction} action
+     * @param {String} tag
+     * @returns {KunHotSpot}
+     */
+    addAction(action, tag = '') {
+        if (action instanceof KunAction) {
+            this._actions.push(action.tag(tag));
+        }
+        return this;
+    };
+    /**
+     * @param {String} tag
+     * @returns {KunAction[]}
+     */
+    actions(tag = '') {
+        return tag ? this._actions.filter(action => action.is(tag)) : this._actions;
+    };
+    /**
+     * @param {String} tag
+     * @returns {KunHotSpot}
+     */
+    runActions(tag = '') {
+        this.actions(tag).forEach(action => action.update());
+        return this;
+    };
+
 }
-/**
- * 
- * @param {Number} x 
- * @param {Number} y 
- * @returns 
- */
-KunTouchEvent.prototype.touched = function( x , y ){
-    return (this._x1 <= x && this._x2 >= x) && (this._y1 <= y && this._y2 >= y);
-};
-/**
- * 
- * @param {Number} x 
- * @param {Number} y 
- * @returns KunTouchEvent
- */
-KunTouchEvent.prototype.test = function( x , y){
-    console.log( `${this.name()} X(${this._x1} >= ${x} <= ${this._x2}) Y(${this._y1} >= ${y} <= ${this._y2})` );
-    return this;
-};
+
 /**
  * 
  */
-KunTouchEvent.Trigger = {
+KunHotSpot.Trigger = {
     'Instant': 'instant',
     'Queue': 'queue',
     'Ignore': 'ignore',
     'Frame': 'frame',
-};
-/**
- * 
- */
-KunTouchEvent.Behaviour = {
-    'Increase': 'increase',
-    'Add': 'add',
-    'Substract': 'sub',
-    'Set': 'set',
-    'Frame': 'frame', //DEPRECATED
-};
-/**
- * Handle conditions to unlock available layers
- * @param {Number} gameVar 
- * @param {String} operation 
- * @param {Number} value 
- */
-function KunLayerCondition( gameVar , operation , value ){
-    this._gameVar = typeof gameVar === 'number' && gameVar > 0 ? gameVar : 0;
-    this._operator = typeof operation === 'string' && operation.length > 0 ? operation : KunLayerCondition.Operators().Equal;
-    this._value = typeof value === 'number' && value > 0 ? value : 1;
-};
-/**
- * @returns Number
- */
-KunLayerCondition.prototype.value = function( ){
-    return this._value;
-};
-/**
- * @param {Boolean} importGameVar 
- * @returns Number
- */
-KunLayerCondition.prototype.gameVar = function( importGameVar ){
-    return typeof importGameVar === 'boolean' && importGameVar ? $gameVariables.value(this.gameVar()) : this._gameVar;
-};
-/**
- * @returns String
- */
-KunLayerCondition.prototype.operator = function( ){
-    return this._operator;
-};
-/**
- * @returns Boolean
- */
-KunLayerCondition.prototype.validate = function( ){
-    if( this.gameVar() > 0 ){
-        switch( this.operator()){
-            case KunLayerCondition.Operators.Greater:
-                return this.gameVar(true) > this.value();
-            case KunLayerCondition.Operators.GreaterOrEqual:
-                return this.gameVar(true) >= this.value();
-            case KunLayerCondition.Operators.Equal:
-                return this.gameVar(true) = this.value();
-            case KunLayerCondition.Operators.LowerOrEqual:
-                return this.gameVar(true) <= this.value();
-            case KunLayerCondition.Operators.Lower:
-                return this.gameVar(true) < this.value();
-        };    
-    }
-    return true;
-};
-/**
- * 
- */
-KunLayerCondition.Operators = {
-    'Greater': 'greater',
-    'GreaterOrEqual': 'greater_equal',
-    'Equal': 'equal',
-    'LowerOrEqual': 'lower_equal',
-    'Lower': 'lower',
+    'NextFrame': 'next',
 };
 
-/**
- * Define a set of actions for each layer upon playing
- * @param {Number} gameVar 
- * @param {String} operation 
- * @param {Number} value 
- * @param {Number[]} gameSwitchesOn 
- * @param {Number[]} gameSwitchesOff 
- * @param {Boolean} runOnce 
- */
-function KunLayerAction( gameVar , operation , value , gameSwitchesOn, gameSwitchesOff , runOnce ){
 
-    this._gameVar = typeof gameVar === 'number' && gameVar > 0 ? gameVar : 0;
-    this._operation = typeof operation === 'string' && operation.length ? operation : KunLayerAction.Operators.Add;
-    this._value = typeof value === 'number' && value > 0 ? value : 0;
-    this._switchOn = Array.isArray( gameSwitchesOn ) ? gameSwitchesOn.map( sw => parseInt( sw ) ) : [];
-    this._switchOff = Array.isArray( gameSwitchesOff ) ? gameSwitchesOff.map( sw => parseInt( sw ) ) : [];
-
-    this._runOnce = runOnce;
-    this._rounds = 0;
-};
 /**
- * @returns String
+ * @type {KunTarget}
+ * @class {KunTarget}
  */
-KunLayerAction.prototype.operation = function( ){
-    return this._operation;
-}
-/**
- * @returns Boolean
- */
-KunLayerAction.prototype.canRun = function( ){
-    return this.rounds() < 1 || !this.runOnce();
-}
-/**
- * @returns Boolean
- */
-KunLayerAction.prototype.runOnce = function( ){
-    return this._runOnce;
-}
-/**
- * @returns Number
- */
-KunLayerAction.prototype.rounds = function( ){
-    return this._rounds;
-}
-/**
- * @returns KunLayerAction
- */
-KunLayerAction.prototype.run = function( ){
-    this._rounds++;
-    return this.updateGameVar().switchOff().switchOn();
-}
-/**
- * @param {Boolean} importValue import the Current Value of this game variable
- * @returns Number
- */
-KunLayerAction.prototype.gameVar = function( importValue ){
-    return typeof importValue === 'boolean' && importValue ? $gameVariables.value(this._gameVar) : this._gameVar;
-}
-/**
- * @returns Number
- */
-KunLayerAction.prototype.value = function( ){
-    return this._value;
-}
-/**
- * @returns KunLayerActions
- */
-KunLayerAction.prototype.updateGameVar = function(){
-    switch( this.operation() ){
-        case KunLayerAction.Operators.Add:
-            $gameVariables.setValue( this.gameVar() , this.gameVar( true ) + this.value());
-            break;
-        case KunLayerAction.Operators.Sub:
-            var current = this.gameVar( true );
-            $gameVariables.setValue( this.gameVar() , current - this.value() > 0 ? current - this.value() : 0);
-            break;
-            case KunLayerAction.Operators.Set:
-            $gameVariables.setValue( this.gameVar() , this.value());
-            break;
-    }
-    this._switchOn.forEach( function( gameSwitch ){
-        $gameSwitches.setValue(gameSwitch,true);
-    });
-    return this;
-};
-/**
- * @returns KunLayerActions
- */
-KunLayerAction.prototype.switchOn = function(){
-    this._switchOn.forEach( function( gameSwitch ){
-        $gameSwitches.setValue(gameSwitch,true);
-    });
-    return this;
-};
-/**
- * @returns KunLayerActions
- */
-KunLayerAction.prototype.switchOff = function(){
-    this._switchOff.forEach( function( gameSwitch ){
-        $gameSwitches.setValue(gameSwitch,false);
-    });
-    return this;
-};
-/**
- * 
- */
-KunLayerAction.Operators = {
-    'Add': 'add',
-    'Sub': 'sub',
-    'Set': 'set',
-};
-/**
- * 
- */
-function KunAnimations_RegisterManagers(){
-
-    var _kunAnimations_Initialize_Sprite = Sprite_Picture.prototype.initialize;
-    Sprite_Picture.prototype.initialize = function( pictureId ){
-        _kunAnimations_Initialize_Sprite.call(this,pictureId);
-        this._touching = false;
-    };
-
-    var _kunAnimations_Load_Bitmap = Sprite_Picture.prototype.loadBitmap;
-    Sprite_Picture.prototype.loadBitmap = function() {
-        //vanilla image preload
-        _kunAnimations_Load_Bitmap.call(this);
-        //setup animation if its a scene spritesheet
-        if( this.isAnimated() ){
-            this.animationScene().reset(true); //initialize and play
-            this.bitmap.addLoadListener(this.initializeAnimation.bind(this));
-        }
-    };
-
-    var _kunAnimations_Update_Sprite = Sprite_Picture.prototype.update;
-    Sprite_Picture.prototype.update = function(){
-        //call vanilla
-        _kunAnimations_Update_Sprite.call( this );
-
-        if( this.isAnimated()){
-            //update the scene manager
-            this.updateAnimation( this.animationScene( ) ).processTouch();
-        }
-    };
+class KunTarget {
     /**
-     * @returns Sprite_Picture
+     * @param {KunHotSpot} spot 
+     * @param {String} picture 
+     * @param {Number} x 
+     * @param {Number} y 
+     * @param {Number} pictureID 
      */
-    Sprite_Picture.prototype.initializeAnimation = function( ){
-        return this.updateAnimation( this.animationScene( ) , true );
-    };
+    constructor(spot = null, picture = '', x = 0, y = 0, pictureID = 0) {
+        this._spot = spot instanceof KunHotSpot ? spot : null;
+        this._picture = picture || '';
+        this._pictureId = pictureID || 0;
+        this._x = x || 0;
+        this._y = y || 0;
+    }
     /**
-     * @param {KunAnimationScene} sceneController
-     * @param {Boolean} forceUpdate
-     * @returns Sprite_Picture
+     * @returns {String}
      */
-    Sprite_Picture.prototype.updateAnimation = function( sceneController , forceUpdate ){
-        if( sceneController.isValid() ){
-            if( sceneController.update() || forceUpdate ){
-                var index = sceneController.getFrame();
-                var w = this.bitmap.width / sceneController.cols();
-                var h = this.bitmap.height / sceneController.rows();
-                var x = index % sceneController.cols() * w;
-                var y = Math.floor(index / sceneController.cols()) * h;
-                this.setFrame( x, y, w, h);
-                //return true;                    
+    toString() { return this.picture() + '.' + this.spot().toString(); };
+    /**
+     * @returns {KunScenePlayer}
+     */
+    playlist() { return KunScenes.manager().player(); }
+    /**
+     * @returns {String}
+     */
+    name() { return this.spot().name(); }
+    /**
+     * @returns {String}
+     */
+    picture() { return this._picture; };
+    /**
+     * @returns {KunAnimation}
+     */
+    animation() { return this.playlist().get(this.picture()); };
+    /**
+     * @returns {KunHotSpot}
+     */
+    spot() { return this._spot; };
+    /**
+     * @returns {String[]}
+     */
+    tags() { return this.spot().tags(); }
+    /**
+     * Pick a tag from the target/spot tag list
+     * @returns {String}
+     */
+    tag() {
+        const tags = this.tags();
+        return tags.length && tags[Math.floor(Math.random() * tags.length)] || '';
+    }
+    /**
+     * @param {String[]} tags 
+     * @returns {Boolean}
+     */
+    tagged(tags = []) { return !!tags.length || !!this.tags().filter(tag => tags.includes(tag)).length; }
+    /**
+     * @param {String[]} tags 
+     * @returns {Boolean}
+     */
+    untagged(tags = []) { return this.tags().filter(tag => tags.includes(tag)).length === 0; }
+    /**
+     * @returns {Number}
+     */
+    x() { return this._x; };
+    /**
+     * @returns {Number}
+     */
+    y() { return this._y; };
+    /**
+     * @returns {Number}
+     */
+    ID() { return this._pictureId; };
+    /**
+     * @returns {KunTarget}
+     */
+    /*position() {
+        KunScenes.manager().setPosition(this.x(), this.y());
+        return this;
+    };*/
+    /**
+     * @returns {KunTarget}
+     */
+    execute() {
+        if (this.valid()) {
+            const animation = this.animation();
+            if (animation && animation.ready()) {
+                this.spot().runActions();
+                //jump to next frameset (if any)
+                animation.select(this.spot().next());
             }
         }
         return this;
     };
     /**
-     * @returns KunAnimationScene
+     * @returns {Boolean}
      */
-    Sprite_Picture.prototype.animationScene = function(){
-        return KunSceneManager.scene(this._pictureName);
+    valid() {
+        return this.spot() && this.picture() && KunScenes.manager().has(this.picture());
     };
+}
+
+
+/**
+ * @class {KunCondition}
+ * @type {KunCondition}
+ */
+class KunCondition {
     /**
-     * @returns Boolean
+     * 
+     * @param {Number} variable 
+     * @param {String} operation 
+     * @param {Number} value 
+     * @param {Boolean} valueAsVar 
+     * @param {Number[]} on 
+     * @param {Number[]} off 
      */
-    Sprite_Picture.prototype.isAnimated = function(){
-        return KunSceneManager.has(this._pictureName);
+    constructor(variable, operation, value = 0, valueAsVar = false, on = [], off = []) {
+        this._variable = typeof variable === 'number' && variable > 0 ? variable : 0;
+        this._operator = typeof operation === 'string' && operation.length > 0 ? operation : KunCondition.Operators().Equal;
+        this._value = typeof value === 'number' && value > 0 ? value : 0;
+        //define if value targets a game Variable
+        this._targetVar = valueAsVar || false;
+        //required switches ON and OFF
+        this._switchOn = Array.isArray(on) ? on : [];
+        this._switchOff = Array.isArray(off) ? off : [];
     }
     /**
-     * @returns Boolean
+     * @returns {Number}
      */
-    Sprite_Picture.prototype.isLoaded = function(){
-        return typeof this.bitmap !== 'undefined' && this.bitmap !== null;
-    };
-
-    Sprite_Picture.prototype.isInteractive = function(){
-        //capture from plugin animation data
-        return this.animationScene().isInteractive();
-    };
-    /**
-     * @param {Number} x 
-     * @returns Number
-     */
-    Sprite_Picture.prototype.offsetX = function( x ){
-        return this.picture().scaleX() > 0 ? Math.floor((x - this.picture().x()) * 100 / this.picture().scaleX()) : 0;
-    };
-    /**
-     * @param {Number} y 
-     * @returns Number
-     */
-    Sprite_Picture.prototype.offsetY = function( y ){
-        return this.picture().scaleY() > 0 ? Math.floor((y - this.picture().y()) * 100 / this.picture().scaleY()) : 0;
-    };
-    /**
-     * @returns Boolean
-     */
-    Sprite_Picture.prototype.validScale = function(  ){
-        return this.picture().scaleX() > 0 && this.picture().scaleY() > 0
+    targetVar() {
+        return this._targetVar && this._value > 0;
     }
     /**
-     * @returns Boolean
+     * @returns {Number}
      */
-    Sprite_Picture.prototype.processTouch = function() {
-        if( this.isAnimated() ){
-            if (TouchInput.isTriggered()) {
-                if( !this._touching ){
-                    this._touching = true;
-                }
-                if(KunSceneManager.canCapture()){
-                    this.animationScene().captureFrom( this.offsetX(TouchInput._x), this.offsetY(TouchInput._y));
-                }
-            }
-            if (TouchInput.isReleased()) {
-                if (this._touching) {
-                    this._touching = false;
-                    //console.log( `Touch ${TouchInput._x},${TouchInput._y} (${this.validScale()})` );
-                    //var picture = this.picture();
-                    if(KunSceneManager.canCapture()){
-                        this.animationScene().captureTo(this.offsetX(TouchInput._x), this.offsetY(TouchInput._y));    
-                    }
-                    else if( KunSceneManager.canTouch() && this.validScale( ) ){
-                        var X = TouchInput._x;
-                        var Y = TouchInput._y;
-                        this.animationScene().touch(this.offsetX(X), this.offsetY(Y), X, Y);
-                    }
-                }
-            }
+    value() {
+        return this.targetVar() ? $gameVariables.value(this._value) : this._value;
+    }
+    /**
+     * @param {Boolean} getValue 
+     * @returns {Number}
+     */
+    variable(getValue = false) {
+        return getValue && $gameVariables.value(this._variable) || this._variable;
+    }
+    /**
+     * @returns {String}
+     */
+    operator() {
+        return this._operator;
+    }
+    /**
+     * @param {Boolean} listValues 
+     * @returns {Number[],Boolean[]}
+     */
+    on(listValues = false) {
+        return listValues ? this._switchOn.map(sw => $gameSwitches.value(sw)) : this._switchOn;
+    }
+    /**
+     * @param {Boolean} listValues 
+     * @returns {Number[],Boolean[]}
+     */
+    off(listValues = false) {
+        return listValues ? this._switchOff.map(sw => $gameSwitches.value(sw)) : this._switchOff;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    validate() {
+        if (this.variable() > 0) {
+            //validate variable
+            switch (this.operator()) {
+                case KunCondition.Operators.Greater:
+                    return this.variable(true) > this.value();
+                case KunCondition.Operators.GreaterOrEqual:
+                    return this.variable(true) >= this.value();
+                case KunCondition.Operators.Equal:
+                    return this.variable(true) === this.value();
+                case KunCondition.Operators.LessOrEqual:
+                    return this.variable(true) <= this.value();
+                case KunCondition.Operators.Less:
+                    return this.variable(true) < this.value();
+            };
         }
-        return this._touching;
-    };
-
-    //OVERRIDE Game_Picture move method to capture the picture offset when required
-    var _kunAnimations_Game_Picture_Move = Game_Picture.prototype.move;
-    Game_Picture.prototype.move = function(origin, x, y, scaleX, scaleY, opacity, blendMode, duration) {
-
-        //capture X and Y offset from picture name
-        if( this._name.length ){
-            //import offset from currently active picture's frameset controller plus the scale
-            var _offset = KunSceneManager.offset(this._name);
-            //then apply the transformations
-            x -= parseInt( _offset.x * (scaleX / 100) );
-            y -= parseInt( _offset.y * (scaleY / 100) );
+        if (this.on(true).filter(val => !val).length > 0) {
+            //count all switched OFF required switches
+            return false;
         }
-
-        _kunAnimations_Game_Picture_Move.call(this,origin,x,y,scaleX,scaleY,opacity,blendMode,duration);
-    };
+        if (this.off(true).filter(val => val).length > 0) {
+            //count all switched ON required switches
+            return false;
+        }
+        return true;
+    }
 }
 /**
  * 
  */
-function KunAnimations_SetupCommands(){
-    var _KunAnimations_SetupCommands = Game_Interpreter.prototype.pluginCommand;
-    Game_Interpreter.prototype.pluginCommand = function(command, args) {
-        _KunAnimations_SetupCommands.call(this, command, args);
-        if (command === 'KunAnimations' && args.length > 0 ) {
-            switch( args[0] ){
-                case 'alias':
-                    if( args.length > 2 ){
-                        KunSceneManager.setAlias( args[1] , args[2] );
-                    }
+KunCondition.Operators = {
+    'Greater': 'greater',
+    'GreaterOrEqual': 'greater_equal',
+    'Equal': 'equal',
+    'LessOrEqual': 'less_equal',
+    'Less': 'less',
+};
+
+/**
+ * @class {KunAction}
+ * @type {KunAction}
+ */
+class KunAction {
+    /**
+     * @param {Number} variable 
+     * @param {String} operation 
+     * @param {Number} value 
+     */
+    constructor(variable, operation = KunAction.Operator.Add, value = 0) {
+        this._variable = variable || 0;
+        this._operation = operation && operation || KunAction.Operator.Add;
+        this._value = value || 0;
+        this._tag = [];
+    }
+    /**
+     * @returns {String}
+     */
+    operation() {
+        return this._operation;
+    }
+    /**
+     * @param {Boolean} asValue 
+     * @returns {Number}
+     */
+    variable(asValue = false) {
+        return asValue ? $gameVariables.value(this._variable) : this._variable;
+    }
+    /**
+     * @returns {Number}
+     */
+    value() {
+        return this._value;
+    }
+    /**
+     * @param {Number} value 
+     * @returns {KunAction}
+     */
+    set(value = 0) {
+        if (this.variable() > 0) {
+            $gameVariables.setValue(this.variable(), value);
+        }
+        return this;
+    }
+    /**
+     * @returns {KunAction}
+     */
+    update() {
+        const amount = this.value();
+        const current = this.variable(true);
+        if (amount > 0) {
+            switch (this.operation()) {
+                case KunAction.Operator.Increase: //backwards compatibility
+                case KunAction.Operator.Add:
+                    this.set(current + amount);
                     break;
-                case 'clear':
-                    if( args.length > 1 ){
-                        switch( args[1]){
-                            case 'targets':
-                                KunSceneManager.clearTargets();
-                                break;
-                            case 'alias':
-                                KunSceneManager.clearAlias();
-                                break;
-                            case 'all':
-                                KunSceneManager.clearAlias().clearTargets();
-                                break;
-                        }
-                    }
-                    else{
-                        KunSceneManager.clearTargets();
-                    }
+                case KunAction.Operator.Sub:
+                    this.set(current - amount > 0 ? current - amount : 0);
                     break;
-                case 'fps':
-                    if( args.length > 2 ){
-                        var fps = parseInt( args[2] );
-                        if( args.length > 3 && args[3] === 'import' ){
-                            fps = $gameVariables.value( fps );
-                        }
-                        KunSceneManager.overrideFPS( KunSceneManager.getAlias(args[1]) ,  fps );
-                        //KunSceneManager.DebugLog(`FPS updated to ${fps}`);
-                    }
-                    break;
-                case 'reset':
-                    if( args.length > 1 ){
-                        KunSceneManager.reset( KunSceneManager.getAlias(args[1]) , args.length > 2 && args[2] === 'replay' );
-                    }
-                    break;
-                case 'set':
-                    if( args.length > 2 ){
-                        var frameSet = args[2].split('.');
-                        var name = KunSceneManager.getAlias(args[1]);
-                        if( frameSet.length > 1 ){
-                            KunSceneManager.overrideSet( name , frameSet[ Math.floor( Math.random() * frameSet.length ) ] );
-                        }
-                        else{
-                            KunSceneManager.overrideSet( name , frameSet[0] );
-                        }
-                        if( args.length > 3 && args[3] === 'wait'){
-                            if ( args.length > 4 ){
-                                var wait = args[4].split(':').map( count => parseInt(count));
-                                this.wait( wait.length > 1 ? wait[0] + Math.floor( Math.random() * ( wait[1] - wait[0] ) ) : wait[0] );
-                            }
-                        }
-                    }
-                    break;
-                case 'randomize':
-                    if( args.length > 1 ){
-                        var name = KunSceneManager.getAlias(args[1]);
-                        KunSceneManager.randomTarget( name );
-                    }
-                    break;
-                case 'pause':
-                    if( args.length > 1 ){
-                        KunSceneManager.stop( KunSceneManager.getAlias(args[1]) );
-                        //KunSceneManager.DebugLog('Animation Paused');
-                    }
-                    break;
-                case 'resume':
-                    if( args.length > 1 ){
-                        KunSceneManager.resume( KunSceneManager.getAlias(args[1]) );
-                        //KunSceneManager.DebugLog('Animation Resumed');
-                    }
-                    break;
-                case 'wait':
-                    if( args.length > 1 ){
-                        var wait = parseInt(args[1]);
-                        if( args.length > 2 && args[2] === 'import' && wait > 0 ){
-                            wait = $gameVariables.value( wait );
-                        }
-                        this.wait( wait );
-                        KunSceneManager.DebugLog(`Waiting ${wait} fps ...`);
-                    }
-                    break;
-                case 'target':
-                    KunSceneManager.target(args.length > 1 && args[1] === 'random');
-                    break;
-                /*case 'play':
-                    if( args.length > 1 ){
-                        KunSceneManager.playBank(args[1]);
-                        if( args.length > 2 ){
-                            KunSceneManager.Wait( parseInt(args[2]) , args.length > 3 ? parseInt(args[3]) : 0 );
-                        }
-                    }
-                    break;*/
-                case 'interruption':
-                    if( args.length > 1 ){
-                        KunSceneManager.stopInterruption( args[1].toLowerCase() === 'on' );
-                    }
-                    else{
-                        KunSceneManager.stopInterruption( false );
-                    }
-                    break;
-                case 'mode':
-                    KunSceneManager.setMode( args.length > 1  ? args[1] : KunSceneManager.Mode().Disabled );
-                    if( KunSceneManager.canCapture() ){
-                        KunSceneManager.DebugLog(`Capture Mode ON. Click and drag over a picture spot, then release to define the target area.`);
-                    }
-                    else{
-                        KunSceneManager.DebugLog(`${KunSceneManager.mode()} mode on`);
-                    }
-                    break;
-                case 'list':
-                    KunSceneManager.list();
+                case KunAction.Operator.Set:
+                    this.set(amount);
                     break;
             }
         }
-    };
+        return this;
+    }
+    /**
+     * @param {String} tag 
+     * @returns {Boolean}
+     */
+    is(tag = '') {
+        return (tag.length + this.tags().length === 0) || this.tags().includes(tag);
+    }
+    /**
+     * @param {String} tag 
+     * @returns {KunAction}
+     */
+    tag(tag = '') {
+        this._tag = tag.length ? tag.split(' ') : [];
+        return this;
+    }
+    /**
+     * @returns {String[]}
+     */
+    tags() {
+        return this._tag;
+    }
+}
+/**
+ * @type {KunAction.Operator|String}
+ */
+KunAction.Operator = {
+    Increase: 'increase', //backwards compatibility
+    Add: 'add',
+    Sub: 'sub',
+    Set: 'set',
+};
 
+
+
+/**
+ * @class {KunTargets}
+ */
+class KunTargets {
+    /**
+     * @param {Number} touchvar
+     * @param {Number} limitvar
+     */
+    constructor(touchvar = 0, limitvar = 0) {
+        this._touch = touchvar || 0;
+        this._limit = limitvar || 0;
+        this.reset();
+    }
+    /**
+     * @returns {KunScenes}
+     */
+    manager() { return KunScenes.manager(); }
+    /**
+     * @returns {KunTarget[]}
+     */
+    targets() { return this._targets; };
+    /**
+     * @returns {Boolean}
+     */
+    locked() { return this._lock; }
+    /**
+     * @returns {KunTargets}
+     */
+    reset() {
+        this._targets = [];
+        return this.lock(false);
+    };
+    /**
+     * Allow to stop any change by other methods while peforming edits in the queue 
+     * @param {Boolean} lock 
+     * @returns {KunTargets}
+     */
+    lock(lock = false) {
+        this._lock = lock;
+        return this;
+    };
+    /**
+     * @param {String[]} tags 
+     * @returns {KunTarget}
+     */
+    include(tags = []) {
+        if (this.count() && !this.locked()) {
+            const targets = this.targets().filter(target => target.tagged(tags));
+            if (targets.length) {
+                const target = targets[Math.floor(Math.random() * targets.length)];
+                this.lock(true);
+                this.targets().splice(this.targets().indexOf(target), 1);
+                this.update().lock(false);
+                return target;
+            }
+        };
+        return null;
+    };
+    /**
+     * @param {String[]} tags 
+     * @returns {KunTarget}
+     */
+    exclude(tags = []) {
+        if (this.count() && !this.locked()) {
+            const targets = this.targets().filter(target => target.untagged(tags));
+            if (targets.length) {
+                const target = targets[Math.floor(Math.random() * targets.length)];
+                this.lock(true);
+                this.targets().splice(this.targets().indexOf(target), 1);
+                this.update().lock(false);
+                return target;
+            }
+        };
+        return null;
+    };
+    /**
+     * @returns {Number}
+     */
+    count() { return this.targets().length; };
+    /**
+     * @returns {Boolean}
+     */
+    full() { return this.count() >= this.size(); };
+    /**
+     * @returns {KunTargets}
+     */
+    drop() {
+        if (this.count() && !this.locked()) {
+            this.lock(true);
+            this.targets().shift();
+            this.update().lock(false);
+            this.manager().playse(this.manager().sfx('cancel'));
+        }
+        return this;
+    };
+    /**
+     * @param {Boolean} random 
+     * @returns {KunTarget}
+     */
+    target(random = false) {
+        if (this.count() && !this.locked()) {
+            this.lock(true);
+            var target = random ?
+                this.targets().splice(Math.floor(Math.random() * this.count()), 1)[0] :
+                this.targets().shift();
+            this.update().lock(false);
+            return target.execute();
+        }
+        return null;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    ready() { return !this.full() && !this.locked(); };
+    /**
+     * @param {KunTarget} target 
+     * @returns {KunTargets}
+     */
+    add(target = null) {
+        if (target instanceof KunTarget && this.ready()) {
+            this.targets().push(target);
+            this.update();
+        }
+        return this;
+    };
+    /**
+     * @returns {KunTargets}
+     */
+    clear() { return this.reset().update(); };
+    /**
+     * @returns {KunTargets}
+     */
+    update() {
+        this._touch && $gameVariables.setValue(this._touch, this.count());
+        return this;
+    };
+    /**
+     * @returns {Number}
+     */
+    size() { return this._limit && $gameVariables.value(this._limit) || 1; };
+}
+
+/**
+ * @class {KunScenePlayer}
+ */
+class KunScenePlayer {
+    /**
+     * 
+     */
+    constructor() {
+
+        this.reset();
+
+    }
+    /**
+     * @returns {KunScenePlayer}
+     */
+    reset() {
+        this._list = [];
+        return this;
+    };
+    /**
+     * @param {Boolean} list 
+     * @returns {KunAnimation[]}
+     */
+    animations() { return this._list; };
+    /**
+     * @returns {KunScenes}
+     */
+    manager() { return KunScenes.manager(); }
+    /**
+     * use this to create an animation from the Sprite_Picture instance
+     * @param {Sprite_Picture} picture 
+     * @returns {KunAnimation}
+     */
+    frompicture(picture = null) {
+        if (picture instanceof Sprite_Picture) {
+            const name = picture._pictureName;
+            const id = picture._pictureId;
+            const found = this.animations().find(anim => anim.name() === name && !anim.canremove()) || null;
+            if (found) {
+                KunScenes.DebugLog(`Found ${found.name()} [ ${found.ID()} ] (${found.alias() || 'requiresalias'})`);
+                return found.setID(id);
+            }
+            return this.create(name, '', id);
+        }
+        return null;
+    }
+    /**
+     * Use this to create an animation from any context out of the Sprite_Picture (create alias, setup ...)
+     * @param {String} name 
+     * @param {String} alias 
+     * @param {Number} id 
+     * @returns {KunAnimation}
+     */
+    fromalias(name = '', alias = '', id = 0) {
+        const found = name && alias && this.animations().find(anim => anim.name() === name && anim.alias() === alias && !anim.canremove()) || null;
+        if (found) {
+            if (id && !found.ID()) {
+                found.setID(id);
+            }
+            KunScenes.DebugLog(`Found ${found.name()} [ ${found.ID() || 'requires id'} ] ( ${found.alias()} )`);
+            return found;
+        }
+        return this.create(name, alias, id);
+    }
+    /**
+     * @param {String} name 
+     * @param {String} alias 
+     * @returns {KunAnimation}
+     */
+    setalias(name = '', alias = '', id = 0) {
+        const found = name && this.animations().find(anim => anim.name() === name && !anim.canremove()) || null;
+        if (found) {
+            //reset all other animations using this alias
+            this.animations().filter(anim => anim.alias() === alias && anim !== found).forEach(anim => anim.rename());
+            //rename to alias
+            return found.rename(alias);
+        }
+        return this.create(name, alias, id);
+    }
+    /**
+     * @param {String} name 
+     * @param {String} alias 
+     * @param {Number} id 
+     * @param {String} starter
+     * @returns {KunAnimation}
+     */
+    create(name = '', alias = '', id = 0, starter = '') {
+        const scene = this.manager().scene(name);
+        if (scene) {
+            KunScenes.DebugLog(`Created ${scene.name()} [ ${id || 'requires id'} ] ( ${alias || 'requires alias'} )`);
+            const animation = scene.createAnimation(alias, id, !!starter, starter);
+            if (animation) {
+                this.add(animation);
+                return animation;
+            }
+        }
+        return null;
+    }
+    /**
+     * @param {String} name 
+     * @param {Number} id 
+     * @param {String} alias 
+     * @param {String} starter 
+     * @returns 
+     */
+    search(name = '', id = 0, alias = '', starter = '') {
+        const found = this.animations().find(anim => anim.isme(alias, id));
+        return found || this.create(name, alias, id, starter);
+    }
+    /**
+     * Misussed?
+     * @param {String} picture 
+     * @param {Number} pictureid 
+     * @param {String} alias 
+     * @param {String} frameset 
+     * @returns {KunAnimation}
+     */
+    setup(picture = '', pictureid = 0, alias = '', frameset = '') {
+        const scene = this.manager().scene(picture);
+        const animation = this.get(picture, pictureid)
+            || scene && scene.createAnimation(alias, pictureid, !!frameset, frameset)
+            || null;
+
+        if (animation) {
+            if (alias) {
+                //do not remove other animations yet, but ensure they're not using this alias anymore
+                this.animations()
+                    .filter(anim => anim !== animation && anim.alias() === alias)
+                    .forEach(anim => anim.rename());
+                animation.rename(alias);
+            }
+            if (pictureid) {
+                animation.setID(pictureid);
+            }
+            this.add(animation);
+            return animation;
+        }
+        return null;
+    };
+    /**
+     * @param {String} name 
+     * @param {String} stage 
+     * @returns {KunScenePlayer}
+     */
+    setstage(name = '', stage = '', reset = false) {
+        const animation = this.get(name);
+        KunScenes.DebugLog(`Change stage to ${name}: ${stage}`);
+        if (animation) {
+            animation.changeStage(stage, reset);
+        }
+        return this;
+    };
+    /**
+     * @param {String} name 
+     * @param {Boolean} useAlias
+     * @returns {Boolean}
+     */
+    has(name = '') {
+        return this.get(name) || false;
+    };
+    /**
+     * @param {String} name 
+     * @param {Number} id
+     * @returns {KunAnimation}
+     */
+    get(name = '', id = 0) { return this.animations().find(a => a.isme(name, id || 0)) || null; };
+    /**
+     * @param {String} name 
+     * @returns {KunMovingAnimation}
+     */
+    getMoving(name = '') {
+        const animation = this.get(name);
+        return !!animation && animation.canmove() && animation || null;
+    }
+    /**
+     * @param {String} name 
+     * @returns {KunInteractiveAnimation}
+     */
+    getInteractive(name = '') {
+        const animation = this.get(name);
+        return !!animation && animation instanceof KunInteractiveAnimation && animation || null;
+    }
+    /**
+     * @param {KunAnimation} animation 
+     * @returns {Boolean}
+     */
+    add(animation = null) {
+        if (animation instanceof KunAnimation && !this.has(animation.name())) {
+            this.animations().push(animation);
+            return true;
+        }
+        return false;
+    }
+    /**
+     * @param {String} name 
+     * @param {String} alias
+     * @param {Number} pictureid
+     * @param {String} fs
+     * @returns {KunAnimation}
+     */
+    loadfromgroup(name = '', alias = '', pictureid = 0, fs = '') {
+        const group = name && this.manager().collections().find(group => group.name() === name) || null;
+        if (group) {
+            const animation = group.load(alias, pictureid, fs);
+            this.add(animation);
+            return animation;
+            //return this.add(animation) && animation || null;
+        }
+        return null;
+    }
+
+    /**
+     * 
+     * @param {String} name 
+     * @param {KunTarget} target 
+     * @param {Number} duration
+     * @returns {Boolean}
+     */
+    target(name = '', target = null, duration = 20) {
+        const animation = this.getMoving(name);
+        if (animation) {
+            target && animation.moveto(target.x(), target.y(), duration);
+            animation.saveTarget(target); //save target or clear if null
+            return true;
+        }
+        return false;
+    }
+    /**
+     * @param {String} animation 
+     * @returns {String[]}
+     */
+    list(animation = '') {
+        const scene = this.get(animation);
+        return scene && scene.playlist() || [];
+    };
+    /**
+     * @param {String} animation 
+     * @param {String[]} list 
+     * @returns {KunScenePlayer}
+     */
+    push(animation = '', list = []) {
+        if (this.has(animation)) {
+            this.get(animation).push(list);
+        }
+        return this;
+    };
+    /**
+     * @param {String} picture 
+     * @param {String} animation
+     * @returns {KunScenePlayer}
+     */
+    play(picture = '', animation = '') {
+        if (this.has(picture)) {
+            this.get(picture).play(animation);
+        }
+        return this;
+    };
+    /**
+     * @param {String} name 
+     * @returns {KunScenePlayer}
+     */
+    clearPlaylist(name = '', frameset = '') {
+        if (name) {
+            const animation = this.get(name);
+            if (animation) {
+                animation.clear(frameset);
+            }
+        }
+        return this;
+    };
+    /**
+     * @param {String} name 
+     * @returns {KunScenePlayer}
+     */
+    clear(name = '') {
+        if (name) {
+            const animation = this.get(name);
+            //animation.picture().remove();
+            animation.mark4Remove(true);    //remove both animation and picture
+            const index = this.animations().indexOf(animation);
+            this.animations().splice(index, 1);
+        }
+        else {
+            this.animations().forEach(animation => {
+                animation.stop();
+                //animation.picture().remove();
+                animation.mark4Remove(true);
+            })
+            return this.reset();
+        }
+        return this;
+    }
+    /**
+     * @param {Boolean} reset
+     * @returns {KunScenePlayer}
+     */
+    stop(reset = false) {
+        this.animations().forEach(a => a.stop(reset));
+        return this;
+    };
+    /**
+     * @param {String} animation 
+     * @param {Number} fps 
+     * @returns {KunScenePlayer}
+     */
+    setFps(animation = '', fps = 0) {
+        const scene = this.get(animation);
+        if (scene) {
+            scene.setFps(fps);
+        }
+        return this;
+    };
+    /**
+     * @param {String} name 
+     * @param {String} target 
+     * @param {Boolean} touch
+     * @returns {KunScenePlayer}
+     */
+    capture(name = '', target = '', touch = false) {
+        const animation = this.getInteractive(name);
+        animation && animation.capture(target, touch, true);
+        return this;
+    };
+}
+
+
+/**
+ * @class {KunTouchInput} process teh input touch (instanced by KunAnimation)
+ */
+class KunTouchInput {
+    /**
+     * 
+     */
+    constructor() {
+        this._count = KunScenes.manager().FPS();
+        //this._count = 1000;
+        this._elapsed = 0;
+        this._button1 = false;
+        this._button2 = false;
+        this._inputs = {
+            touch: false,
+            back: false,
+            cancel: false,
+        }
+
+        this._scroll = 0;
+        this._scrollprecission = 4;
+        this._capture = [];
+    }
+    /**
+     * @returns {Boolean}
+     */
+    tick() {
+        this._elapsed = ++this._elapsed % this._count;
+        return this.updated();
+    }
+    /**
+     * @returns {Boolean}
+     */
+    updated() { return !this._elapsed; }
+    /**
+     * @param {String} action 
+     * @param {Boolean} value 
+     * @returns {KunTouchInput}
+     */
+    set(action = '', value = false) {
+        if (action && this._inputs.hasOwnProperty(action)) {
+            this._inputs[action] = value;
+        }
+        return this;
+    }
+    /**
+     * @param {String} action 
+     * @returns {Boolean}
+     */
+    get(action = '') { return action && this._inputs[action] || false; }
+    /**
+     * @returns {Boolean}
+     */
+    cantouch() { return KunScenes.manager().canTouch(); }
+    /**
+     * @returns {Boolean}
+     */
+    canscroll() { return KunScenes.manager().canWheel(); };
+    /**
+     * @returns {KunTouchInput}
+     */
+    inputscroll() {
+        if (this.canscroll() && ++this._scroll % this._scrollprecission === 0) {
+            KunScenes.manager().scroll(TouchInput.wheelY);
+        }
+        return this;
+    };
+    /**
+     * @returns {Boolean}
+     */
+    down1() {
+        if (TouchInput.isTriggered()) {
+            if (!this._button1) {
+                this._button1 = true;
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    up1() {
+        if (TouchInput.isReleased() && this._button1) {
+            this._button1 = false;
+            return true;
+        }
+        return false;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    up2() {
+        if (this._button2 && this.tick()) {
+            this._button2 = false;
+            return true;
+        }
+        return false;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    down2() {
+        if (TouchInput.isCancelled()) {
+            if (!this._button2) {
+                this._button2 = true;
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * @returns {KunTouchInput}
+     */
+    clear() {
+        this._button1 = false;
+        this._button2 = false;
+        const inputs = this._inputs;
+        Object.keys(inputs).forEach(input => inputs[input] = false);
+        return this;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    update() {
+        if (this.changed()) {
+            this.set('touch', !this.button2() && this.button1());
+            this.set('back', this.button2() && !this.button1());
+            this.set('cancel', this.button2() && this.button1());
+            return true;
+        }
+        return false;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    changed() { return this.up2() || this.up1() || this.down2() || this.down1(); }
+    /**
+     * @returns {Boolean}
+     */
+    button1() { return this._button1; }
+    /**
+     * @returns {Boolean}
+     */
+    button2() { return this._button2; }
+    /**
+     * @param {Boolean} close
+     * @returns {Boolean}
+     */
+    capture(close = false) {
+        if (KunScenes.manager().canCapture()) {
+            const input = KunTouchInput.spot();
+            if (close) {
+                this._capture.push(input[0]);
+                this._capture.push(input[1]);
+            }
+            else {
+                this._capture = [input[0], input[1]];
+            }
+            return true;
+        }
+        return false;
+    }
+    /**
+     * @returns {Number[]}
+     */
+    spot() { return [TouchInput._x, TouchInput._y]; }
+    /**
+     * @param {Game_Picture} picture 
+     * @returns {Number[]}
+     */
+    offset(picture = null) {
+        if (picture instanceof Game_Picture) {
+            const spot = this.spot();
+            return [
+                picture.scaleX() ? Math.floor((spot.x - picture.x()) * 100 / picture.scaleX()) : 0,
+                picture.scaleY() ? Math.floor((spot.y - picture.y()) * 100 / picture.scaleY()) : 0,
+            ];
+        }
+        return [0, 0];
+    }
+}
+
+
+/**
+ * 
+ */
+function KunAnimations_RegisterManagers() {
+
+    const _kunAnimations_Initialize_Sprite = Sprite_Picture.prototype.initialize;
+    Sprite_Picture.prototype.initialize = function (pictureId) {
+        _kunAnimations_Initialize_Sprite.call(this, pictureId);
+        this._animation = null;
+    };
+    /**
+     * @returns {KunAnimation}
+     */
+    Sprite_Picture.prototype.animation = function () { return this._animation || null; };
+    /**
+     * Sprite_Picture.loadBitmap WON'T BE CALLED if the picture ID already points to the SAME SOURCE!!
+     */
+    const _kunAnimations_Load_Bitmap = Sprite_Picture.prototype.loadBitmap;
+    Sprite_Picture.prototype.loadBitmap = function () {
+        //vanilla image preload
+        _kunAnimations_Load_Bitmap.call(this);
+        this._animation = this.setupAnimation();
+    };
+    const _kunAnimations_SpritePicture_UpdateBitmap = Sprite_Picture.prototype.updateBitmap;
+    Sprite_Picture.prototype.updateBitmap = function () {
+        //vanilla
+        _kunAnimations_SpritePicture_UpdateBitmap.call(this);
+        //new override method, better to focus inthe sprite frame
+        this.updateAnimation();
+    }
+    /**
+     * @returns {KunAnimation}
+     */
+    Sprite_Picture.prototype.setupAnimation = function () {
+        //setup animation if its a scene spritesheet. If animation already is set, check if it must be replaced
+        const animation = this.animation() && this.animation().changePicture(this) || KunScenes.manager().player().frompicture(this);
+        if (animation) {
+            animation.play();
+            this.bitmap.addLoadListener(() => animation.updateanimation(this));
+        }
+        return animation;
+    }
+    /**
+     * @returns {Boolean}
+     */
+    Sprite_Picture.prototype.updateAnimation = function () {
+        if (this.animation()) {
+            if (!this.animation().canremove()) {
+                return this.animation().update(this);
+            }
+            else {
+                this._animation = null;
+            }
+        }
+        return false;
+    }
+}
+
+/***************************************************************************
+ * COMMAND MANAGER
+ **************************************************************************/
+/**
+ * @class {KunSceneCommands}
+ */
+class KunSceneCommand {
+    /**
+     * @param {Game_Interpreter}
+     * @param {String[]} input 
+     */
+    constructor(context = null, input = []) {
+        this._context = context instanceof Game_Interpreter && context || null;
+        this.initialize(input);
+        KunScenes.DebugLog(this.command(), this.arguments(), this._flags);
+    }
+    /**
+     * @param {Game_Interpreter} context 
+     * @param {String[]} args 
+     * @returns {KunSceneCommand}
+     */
+    static create(context = null, args = []) {
+        return new KunSceneCommand(context, args);
+    }
+    /**
+     * @param {String[]} input 
+     */
+    initialize(input = '') {
+        this._flags = [];
+        //prepare input string
+        const content = input.join(' ');
+        //extract flags
+        const regex = /\[([^\]]+)\]/g;
+        let match;
+        while ((match = regex.exec(content)) !== null) {
+            match[1].split("|").forEach(flag => this._flags.push(flag.toLowerCase()));
+        }
+        //return clean args array without flags
+        const command = content.replace(regex, '').split(' ').filter(arg => arg.length);
+        this._command = command.shift();
+        this._args = command;
+    }
+    /**
+     * @returns {String}
+     */
+    toString() {
+        return `${this.command().toUpperCase()} {${this.arguments().join(' ')}} [${this._flags.join('|')}]`;
+    }
+    /**
+     * @returns {KunScenes}
+     */
+    manager() { return KunScenes.manager(); }
+    /**
+     * @returns {KunScenePlayer}
+     */
+    player() { return this.manager().player(); }
+    /**
+     * @returns {KunTargets}
+     */
+    targets() { return this.manager().targets(); }
+    /**
+     * @returns {Game_Interpreter}
+     */
+    context() { return this._context; }
+    /**
+     * @param {String} flag 
+     * @returns {Boolean}
+     */
+    has(flag = '') { return flag && this._flags.includes(flag) || false; }
+    /**
+     * @returns {String}
+     */
+    command() { return this._command; }
+    /**
+     * @returns {String[]}
+     */
+    arguments() { return this._args; }
+    /**
+     * @returns {Number}
+     */
+    count() { return this.arguments().length; }
+    /**
+     * @returns {Number}
+     */
+    wait(fps = 10) { this.context().wait(fps); }
+    /**
+     * 
+     */
+    waitMessage() { this.context().setWaitMode('message'); }
+    /**
+     * @returns {Boolean}
+     */
+    run() {
+        if (this.context()) {
+            const command = this.command() && `${this.command()}Command` || '';
+            const manager = this.manager();
+            if (command && typeof this[command] === 'function') {
+                if (manager.debug() > KunScenes.DebugMode.Enabled) {
+                    KunScenes.DebugLog(`Running Command: ${this.toString()}`);
+                }
+                this[command](this.arguments());
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} args 
+     */
+    testCommand(args = []) {
+        KunScenes.DebugLog(`Test Command: "${args.join()}"`);
+    }
+    /**
+     * @param {String[]} args 
+     */
+    speedCommand(args = []) {
+        return this.variantCommand(args);
+    }
+    /**
+     * @param {String[]} args 
+     */
+    variantCommand(args = []) {
+        if (args.length > 1) {
+            const values = args[1].split(':').map(value => parseInt(value));
+            const playlist = this.player();
+            if (args.includes('import')) {
+                values = values.map(value => $gameVariables.value(value));
+            }
+            args[1].split(':')
+                .map(name => playlist.get(name))
+                .forEach(anim => anim && anim.setVariant(values[Math.floor(Math.random() * values.length)]));
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    stagemenuCommand(args = []) {
+        if (args.length) {
+            return this.createStageMenu(this.player().get(args[0]),
+                args[1] || 'skip',
+                args[2] || 'right',
+                args[3] || 'window'
+            );
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    spotmenuCommand(args = []) {
+        if (args.length) {
+            return this.createTouchMenu(this.player().get(args[0]),
+                args.includes('touch') && 'touch' || 'target',
+                args[1] || 'skip',
+                args[2] || 'right',
+                args[3] || 'window'
+            );
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} args 
+     */
+    animationmenuCommand(args = []) {
+        if (args.length) {
+            this.createAnimationMenu(this.player().get(args[0]), args[1] || 'skip', args[2] || 'right', args[3] || 'window');
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    actionsCommand(args = []) {
+        if (args.length) {
+            const animation = this.player().get(args[0]);
+            if (animation) {
+                animation.runActions(args.length > 1 && args[1] || '');
+            }
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    loadgroupCommand(args = []) {
+        this.collectionCommand(args);
+    }
+    /**
+     * @param {String[]} args 
+     */
+    loadstagesCommand(args = []) {
+        this.collectionCommand(args);
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    loadCommand( args = [] ){
+        return this.collectionCommand(args );
+    }
+    /**
+     * Load an animation and setup all animation stages from a group
+     * @param {String[]} args 
+     */
+    collectionCommand(args = []) {
+        if (args.length > 1) {
+            const collection = args[0].split(':');
+            const setup = args[1].split(':').map(att => parseInt(att));
+            const alias = args.length > 2 ? args[2] : '';
+            const animation = this.player().loadfromgroup(
+                collection[Math.floor(Math.random() * collection.length)],
+                alias, setup[0]
+            );
+            if (animation && setup.length > 1) {
+                const picture = animation.picture();
+                //remove the id from the setup array
+                picture.show(...setup.slice(1));
+            }
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    createCommand(args = []) {
+        if (args.length) {
+            const playlist = this.player();
+            const pictures = args[0].split(':');
+            const setup = args[1].split(':').map(n => parseInt(n));
+            const alias = args[2] || '';
+            const fs = args[3] && args[3].split(':') || [];
+            const picture = pictures[pictures.length > 1 ? Math.floor(Math.random() * pictures.length) : 0];
+            const animation = playlist.get(alias || picture, setup[0])
+                || playlist.create(picture, alias, setup[0],
+                    fs.length ? fs[Math.floor(Math.random() * fs.length)] : '');
+            if (animation && setup.length > 1) {
+                animation && animation.picture().show(...setup.slice(1));
+            }
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    playlistCommand(args = []) {
+        const playlist = this.player();
+        if (args.length > 1) {
+            const list = args[1].split(':');
+            const clear = list.includes('clear');
+            args[0].split(':').forEach(name => {
+                const animation = playlist.get(name);
+                if (animation) {
+                    if (clear) {
+                        animation.clear();
+                    }
+                    else {
+                        animation.push(name, list);
+                    }
+                }
+            });
+        }
+        else if (args.includes('clear')) {
+            playlist.animations().forEach(animation => animation.clear());
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    spotCommand(args = []) {
+        if (args.length) {
+            const animations = args[0].split(':')
+                .map(anim => this.player().getInteractive(anim))
+                .filter(anim => !!anim);
+            //const animation = animations[Math.floor(Math.random() * animations.length)];
+            const spots = args.length > 1 && !args[1].includes('import') && args[1].split(':') || [];
+            const count = args.length > 2 && args[1] === 'import' && $gameVariables.value(parseInt(args[2])) || 1;
+            if (count && animations.length) {
+                for (let i = 0; i < count; i++) {
+                    const animation = animations[Math.floor(Math.random() * animations.length)];
+                    const spot = spots.length && spots[Math.floor(Math.random() * spots.length)] || '';
+                    animation.capture(spot, true, true);
+                }
+                this.manager().playse(this.manager().sfx());
+            }
+        }
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    spotsCommand(args = []) {
+        if (args.length) {
+            const animations = args[0].split(':')
+                .map(anim => this.player().getInteractive(anim))
+                .filter(anim => !!anim);
+            const count = args[1] && parseInt(args[1]) || 1;
+            const exclusive = this.has('exclusive');
+            const counter = this.has('import') && $gameVariables.value(count) || count;
+            const tags = args[2] && args[2].split(':');
+            if (counter && animations.length) {
+                for (let i = 0; i < counter; i++) {
+                    const animation = animations[Math.floor(Math.random() * animations.length)];
+                    const spots = tags.length && animation.tagspots(tags[i % tags.length], exclusive) || animation.spots();
+                    //console.log(animation.name(),spots);
+                    const spot = spots.length && spots[Math.floor(Math.random() * spots.length)] || '';
+                    animation.capture(spot, true, true);
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} args 
+     */
+    queueCommand(args = []) {
+        if (args.length) {
+            const playlist = this.player();
+            const spots = args.length > 1 && args[1].split(':') || [''];
+            const touch = args.length > 2 && args[2] === 'touch';
+            spots.forEach(spot => playlist.capture(args[0], spot, touch));
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    targetCommand(args = []) {
+        const targets = this.targets();
+        if (args.length) {
+            switch (args[0] || '') {
+                case 'random':
+                    targets.target(true);
+                    break;
+                default:
+                    //assign a target directly to the alias or aliases
+                    const playlist = this.player();
+                    const speed = args[1] && args[1].split(':').map(w => parseInt(w)) || [];
+                    const wait = speed.length && speed[Math.floor(Math.random() * speed.length)] || 20;
+                    args[0].split(':').forEach(alias => playlist.target(alias, targets.target(args.includes('random')), wait));
+                    break;
+            }
+        }
+        else {
+            targets.target();
+        }
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    fixCommand(args = []) {
+        if (args.length > 1) {
+            const fix = args[1].split(':').map(p => parseInt(p));
+            const playlist = this.player();
+            args[0].split(':')
+                .map(alias => playlist.getMoving(alias))
+                .filter(anim => !!anim)
+                .forEach(anim => anim.fix(...fix));
+        }
+        return false;
+    }
+    /**
+     * @param {KunTarget} target 
+     * @param {String[]} tagged 
+     * @param {Number[]} position 
+     */
+    targetEffect(target = null, tagged = [], position = []) {
+        if (target instanceof KunTarget) {
+            if (target && tagged.length) {
+                tagged.forEach(animation => this.player().tag(animation, target.tags()));
+            }
+            else if (position.length) {
+                this.manager().setPosition(position[0], position[1] || position[0]);
+            }
+        }
+    }
+    /**
+     * 
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    renameCommand(args = []) {
+        return this.aliasCommand(args);
+    }
+    /**
+     * @param {String[]} args 
+     */
+    aliasCommand(args = []) {
+        if (args.length > 1) {
+            //do not allow reset alias on teh same animation if already playing
+            const animation = this.player().setalias(args[1], args[0], args[2] && parseInt(args[2]) || 0);
+            return !!animation;
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} args 
+     */
+    stageCommand(args = []) {
+        if (args.length > 1) {
+            //remove dash from stage names, replace by underscore
+            const stages = args[1].split(':').map(stage => stage.replace(/-/g, '_'));
+            this.player().setstage(args[0], stages[Math.floor(Math.random() * stages.length)]);
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    prepareCommand(args = []) {
+        this.player().clear();
+        this.targets().clear();
+    }
+    /**
+     * @param {String[]} args 
+     */
+    completeCommand(args = []) {
+        //clear all referenecs before starting scene
+        this.player().clear();
+        this.targets().clear();
+    }
+    /**
+     * @param {String[]} args 
+     */
+    clearCommand(args = []) {
+        switch (args[0] || '') {
+            case 'playlist':
+            case 'scenes':
+                this.player().clearPlaylist();
+                break;
+            case 'all':
+                this.player().clear();
+                this.targets().clear();
+                break;
+            case 'targets':
+                this.targets().clear();
+            default:
+                //remove targets from cursor animations
+                const playlist = this.player();
+                args[0] && args[0].split(':')
+                    .map(alias => playlist.getMoving(alias))
+                    .filter(anim => !!anim)
+                    .forEach(anim => anim.saveTarget());
+                break;
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    fpsCommand(args = []) {
+        if (args.length > 1) {
+            var fps = parseInt(args[1]);
+            if (this.has('import')) {
+                fps = $gameVariables.value(fps);
+            }
+            const animation = this.player().get(args[0]);
+            if (animation) {
+                animation.setFps(fps);
+            }
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    playCommand(args = []) {
+        if (args.length > 1) {
+            const playlist = this.player();
+            const framesets = args[1].replace(/\./g, ':').split(':');
+            const spots = (args.length > 2 && args[2] === 'spot' && args.length > 3 && args[3].split(':')) || [];
+            args[0].split(':').map(name => playlist.get(name)).filter(anim => anim !== null).forEach(animation => {
+                //play random selection for any animated picture :D
+                animation.play(framesets[Math.floor(Math.random() * framesets.length)]);
+                if (spots.length) {
+                    this.player().capture(animation.name(), spots[Math.floor(Math.random() * spots.length)]);
+                }
+            });
+            if (args.length > 2 && args[2] === 'wait') {
+                if (args.length > 3) {
+                    const wait = args[3].split(':').map(count => parseInt(count));
+                    this.wait(wait.length > 1 ? wait[0] + Math.floor(Math.random() * wait[1]) : wait[0]);
+                }
+            }
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    setCommand(args = []) {
+        this.playCommand(args);
+    }
+    /**
+     * @param {String[]} args 
+     */
+    resetCommand(args = []) {
+        if (args.length) {
+
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    pauseCommand(args = []) {
+        if (args.length) {
+            const playlist = this.player();
+            args[0].split(':')
+                .filter(animation => playlist.has(animation))
+                .map(animation => playlist.get(animation))
+                .forEach(animation => animation.stop());
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    resumeCommand(args = []) {
+        if (args.length) {
+            const playlist = this.player();
+            args[0].split(':')
+                .filter(scene => playlist.has(scene))
+                .map(scene => playlist.get(scene))
+                .forEach(scene => scene.play());
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    waitCommand(args = []) {
+        if (args.length) {
+            var wait = args[0].split(':').map(t => parseInt(t));
+            if (this.has('import') && wait > 0) {
+                wait[0] = $gameVariables.value(wait[0]);
+                if (wait.length > 1) {
+                    wait[1] = $gameVariables.value(wait[1]);
+                }
+            }
+            this.wait(wait.length > 1 ? wait[0] + Math.floor(Math.random() * wait[1]) : wait[0]);
+            //KunScenes.DebugLog(`Waiting ${wait[0]} +(${wait.length > 1 ? wait[1] : 0}) fps ...`);
+        }
+    }
+    /**
+     * animation list: animation:animation:animation
+     * state: on|off
+     * playback animations: frameset:frameset:frameset
+     * @param {String[]} args 
+     */
+    playbackCommand(args = []) {
+        if (args.length) {
+            const playback = args.length < 1 || args[1] === 'on';
+            const list = args.length > 2 && args[2].split(':') || [];
+            args[0].split(':')
+                .map(name => this.player().get(name))
+                .filter(animation => animation !== null)
+                .forEach(animation => {
+                    if (playback) {
+                        list.forEach(fs => animation.push(fs));
+                        animation.setMode(KunAnimation.Mode.PlayBack);
+                    }
+                    else {
+                        animation.setMode(KunAnimation.Mode.Default);
+                        animation.clear();
+                    }
+                });
+        }
+    }
+    /**
+     * @param {String[]} args 
+     */
+    modeCommand(args = []) {
+        const mode = args[0] || KunAnimation.Mode.Disabled;
+        if (args.length > 1) {
+            args[1].split(':')
+                .map(anim => this.player().get(anim))
+                .filter(anim => !!anim)
+                .forEach(anim => anim.setMode(mode));
+            if (mode === KunAnimation.Mode.Touch && this.manager().mode() === KunAnimation.Mode.Disabled) {
+                //set mode touch if touch enabled for some sprite
+                this.manager().setMode(mode);
+            }
+        }
+        else {
+            this.manager().setMode(mode);
+        }
+    }
+    /**
+     * Export an animation's x and y into x,y game variables
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    positionCommand(args = []) {
+        if (args.length > 1) {
+            const animation = this.player().getMoving(args[0]);
+            if (animation) {
+                const gamevars = args[1].split(':').map(n => parseInt(n));
+                animation.position().forEach((pos, i) => {
+                    gamevars[i] && $gameVariables.setValue(gamevars[i], pos);
+                });
+                //Debug Log
+                KunScenes.DebugLog(`positionCommand: ${gamevars.map(i => $gameVariables.value(i)).join(',')}`);
+                //$gameVariables.setValue(pos[0], animation.x());
+                //pos.length > 1 && $gameVariables.setValue(pos[1], animation.y());
+                //console.log( animation.x(),animation.y() );
+            }
+        }
+    }
+    /**
+     * replace by pathpoints
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    movetoCommand(args = []) {
+        if (args.length > 1) {
+            //const animation = this.playlist().getDynamicAnim(args[0]);
+            const animation = this.player().getMoving(args[0]);
+            if (animation) {
+                //get from remaining args at posiiton 1
+                const paths = args[1].split(':');
+                const duration = args[2] && this.randomSelector(args[2].split(':').map(n => parseInt(n))) || 0;
+                animation.movetopath(
+                    paths[Math.floor(Math.random() * paths.length)],
+                    duration
+                );
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    effectsCommand(args = []) {
+        if (args.length) {
+            const opacity = args[1] && parseInt(args[1]) % 256 || 255;
+            const blend = args[2] && parseInt(args[2]) % 4 || 0;
+            args[0].split(':')
+                .map(anim => this.player().get(anim))
+                .filter(anim => !!anim)
+                .forEach(anim => anim.picture().applyEffects(opacity, blend));
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    addlocationCommand(args = []) {
+        return this.pathCommand(args);
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    addpathCommand(args = []) {
+        return this.pathCommand(args);
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    pathCommand(args = []) {
+        if (args.length > 1) {
+            //move a dynamic animation to a default position
+            const animation = this.player().getMoving(args[0]);
+            //since version 4, animation must be of KunMovingAnim type (set canmove flag in scene loader)
+            if (animation) {
+                const points = args.length > 2 && args.slice(2) || [];
+                points.map(p => p.split(':').map(c => parseInt(c)))
+                    .forEach(p => animation.addpath(args[1], p[0], p[1] || p[0]));
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    mapspotCommand(args = []) {
+        if (args.length > 1) {
+            const targets = this.targets();
+            const animation = this.player().getMoving(args[0]);
+            //since version 4, animation must be of KunMovingAnim type (set canmove flag in scene loader)
+            if (animation) {
+                const tags = args[1] && args[1].split(':') || [];
+                const idle = args[2] || ''
+                const duration = args[4] && parseInt(args[3]) / parseFloat(100) || 1;
+                const label = args[4] || '';
+                switch (tags[0] && tags.shift() || '') {
+                    case 'include':
+                        animation.maptarget(targets.include(tags), duration, idle) || this.jumpToLabel(label);
+                        break;
+                    case 'exclude':
+                        animation.maptarget(targets.exclude(tags), duration, idle) || this.jumpToLabel(label);
+                        break;
+                    case 'random':
+                        animation.maptarget(targets.target(true), duration, idle) || this.jumpToLabel(label);
+                        break;
+                    default:
+                        animation.maptarget(targets.target(), duration, idle) || this.jumpToLabel(label);
+                        break;
+                }
+                this.wait(duration * 20);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    tagspotCommand(args = []) {
+        if (args.length > 1) {
+            //play animations based on the current targets' tags
+            //tagspot alias:alias:... [include|exclude]:tag:tag:... pos:pos
+            const targets = this.targets();
+            const animation = this.player().getMoving(args[0]);
+            //since version 4, animation must be of KunMovingAnim type (set canmove flag in scene loader)
+            if (animation) {
+                const tags = args[1] && args[1].split(':') || [];
+                const idle = args[2] || ''
+                const duration = args[4] && parseInt(args[3]) / parseFloat(100) || 1;
+                const label = args[4] || '';
+                switch (tags[0] && tags.shift() || '') {
+                    case 'include': //only inclusive
+                        animation.tagtarget(targets.include(tags), duration, idle) || this.jumpToLabel(label);
+                        break;
+                    case 'exclude': //all framesets but exluded
+                        animation.tagtarget(targets.exclude(tags), duration, idle) || this.jumpToLabel(label);
+                        break;
+                    case 'random':
+                        animation.tagtarget(targets.target(true), duration, idle) || this.jumpToLabel(label);
+                        break;
+                    default:
+                        animation.tagtarget(targets.target(), duration, idle) || this.jumpToLabel(label);
+                        break;
+                }
+                this.wait(duration * 20);
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    mapanimationCommand(args = []) {
+        if (args.length > 2) {
+            const animation = this.player().get(args[0]);
+            const gameVar = parseInt(args[1]);
+            const list = args[2].split(':');
+            if (animation) {
+                animation.clear();
+                animation.setVarMap(gameVar);
+                list.forEach(item => animation.push(item));
+                return true;
+            }
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    playmapCommand(args = []) {
+        if (args.length) {
+            const animation = this.player().get(args[0]);
+            if (animation) {
+                animation.playMap();
+            }
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} args 
+     * @returns {Boolean}
+     */
+    isplayingCommand(args = []) {
+        if (args.length > 1) {
+            const list = args[0].split(':');
+            const animation = this.player().get(list.shift());
+            const labels = args[1].split(':');
+            if (animation) {
+                //animation:stage:stage:stage
+                if (list.length) {
+                    if (list.some(fs => animation.current() === fs)) {
+                        this.jumpToLabels(labels);
+                        return true;
+                    }
+                }
+                else {
+                    //animation only
+                    this.jumpToLabels(labels);
+                    return true;
+                }
+            }
+            //fallback
+            args[2] && this.jumpToLabel(args[2].split(':'));
+        }
+        return false;
+    }
+
+    //// menu helpers
+
+
+    /**
+     * @param {KunAnimation} animation 
+     * @param {String} cancel 
+     * @param {String} position 
+     * @param {String} background 
+     * @returns {Boolean}
+     */
+    createAnimationMenu(animation = null, cancel = 'skip', position = 'right', background = 'window') {
+        if (animation instanceof KunAnimation) {
+            const options = animation.mapAnimationLabels();
+            const _animations = options.map(option => Object.keys(option)[0]);
+            const _choices = options.map(option => Object.values(option)[0]);
+
+            return this.createMenu(_choices, cancel, background, position, function (selected) {
+                animation.play(_animations[selected]);
+            });
+        }
+        return false;
+    }
+    /**
+     * @param {KunAnimation} animation 
+     * @param {Boolean} capture
+     * @param {String} cancel 
+     * @param {String} position 
+     * @param {String} background 
+     * @returns {Boolean}
+     */
+    createTouchMenu(animation = null, capture = false, cancel = 'skip', position = 'right', background = 'window') {
+        if (animation instanceof KunAnimation) {
+            const options = animation.mapSpotLabels();
+            const _spots = options.map(option => Object.keys(option)[0]);
+            const _choices = options.map(option => Object.values(option)[0]);
+
+            return this.createMenu(_choices, cancel, background, position, function (selected) {
+                animation.capture(_spots[selected], !capture);
+            });
+        }
+        return false;
+    }
+    /**
+     * @param {KunAnimation} animation 
+     * @param {String} cancel 
+     * @param {String} position 
+     * @param {String} background 
+     * @returns {Boolean}
+     */
+    createStageMenu(animation = null, cancel = 'skip', position = 'right', background = 'window') {
+        if (animation instanceof KunAnimation) {
+            const options = animation.mapStages();
+            const _stages = options.map(option => Object.keys(option)[0]);
+            const _choices = options.map(option => Object.values(option)[0]);
+
+            return this.createMenu(_choices, cancel, background, position, function (selected) {
+                animation.changeStage(_stages[selected], true);
+            });
+        }
+        return false;
+    }
+    /**
+     * @param {String[]} options 
+     * @param {String} cancel 
+     * @param {String} background 
+     * @param {String} position 
+     * @param {Function} callback 
+     * @returns {Boolean}
+     */
+    createMenu(options = [], cancel = '', background = '', position = '', callback = null) {
+        const context = this.context();
+        if (options.length && typeof callback === 'function' && context) {
+            $gameMessage.setChoices(options, 0, this.menuCancelType(cancel, options.length));
+            $gameMessage.setChoiceBackground(this.getMenuBackground(background));
+            $gameMessage.setChoicePositionType(this.getMenuPosition(position));
+            $gameMessage.setChoiceCallback(callback.bind(context));
+            return true;
+        }
+        return false;
+    }
+    /**
+     * @returns {String[]}
+     */
+    menuPositions() { return ['left', 'middle', 'right']; }
+    /**
+     * @param {String} position 
+     * @returns {Number}
+     */
+    getMenuPosition(position = '') {
+        const positions = this.menuPositions();
+        return position && positions.includes(position) ? positions.indexOf(position) : 2;
+    }
+    /**
+     * @returns {String[]}
+     */
+    menuBackground() { return ['window', 'dim', 'transparent']; }
+    /**
+     * @param {String} bg 
+     * @returns {Number}
+     */
+    getMenuBackground(bg = '') {
+        const backgrounds = this.menuBackground();
+        return bg && backgrounds.includes(bg) ? backgrounds.indexOf(bg) : 2;
+    }
+    /**
+     * 
+     * @param {String} type 
+     * @param {Number} amount 
+     * @returns {Number}
+     */
+    menuCancelType(type = 'skip', amount = 2) {
+        switch (type) {
+            case 'random':
+                return Math.floor(Math.random() * amount);
+            case 'last':
+                return amount - 1;
+            case 'skip':
+                return -2;
+            case 'disable':
+                return -1;
+            case 'first':
+            default:
+                return 0;
+        }
+    }
+
+    //LABEL HELPERS
+
+    /**
+     * @param {String[]} labels 
+     * @param {Boolean} random 
+     * @returns {Boolean}
+     */
+    jumpToLabels(labels = [], random = false) {
+        KunScenes.DebugLog(`Searching for Label in [${labels.join(',')}]... ${random && '(random)' || '(fallback)'}`);
+        return random ?
+            //jump to random labels in the list
+            this.jumpToLabel(labels.length && labels[Math.floor(Math.random() * labels.length)] || '') :
+            //jump to first available label in the list
+            labels.find(lbl => this.jumpToLabel(lbl)) || false;
+    }
+    /**
+     * @param {String} label
+     * @returns {Boolean}
+     */
+    jumpToLabel(label = '') {
+        const context = this.context();
+        if (context && label) {
+            const lbl = label.toUpperCase();
+            KunScenes.DebugLog(`Searching for Label [${lbl}]...`);
+            for (var i = 0; i < context._list.length; i++) {
+                var command = context._list[i];
+                if (command.code === 118 && command.parameters[0] === lbl) {
+                    context.jumpTo(i);
+                    KunScenes.DebugLog(`Jumping to Label [${lbl}]`);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+    /**
+     * @param {Number[]} values
+     * @returns {Number}
+     */
+    randomSelector(values = []) {
+        switch (true) {
+            case values.length > 2:
+                return values[Math.floor(Math.random() * values.length)];
+            case values.length > 1:
+                return Math.floor(Math.random() * (values[1] - values[0])) + values[0];
+            case values.length:
+                return values[0];
+        }
+        return 0;
+    }
+}
+
+
+
+/**
+ * 
+ */
+function KunAnimations_SetupCommands() {
+    var _KunAnimations_SetupCommands = Game_Interpreter.prototype.pluginCommand;
+    Game_Interpreter.prototype.pluginCommand = function (command, args) {
+        _KunAnimations_SetupCommands.call(this, command, args);
+        if (KunScenes.command(command) && args.length) {
+
+            KunSceneCommand.create(this, args).run();
+        }
+    };
 }
 
 /********************************************************************************************************************
@@ -2654,14 +5517,14 @@ function KunAnimations_SetupCommands(){
  * 
  *******************************************************************************************************************/
 
- (function( /* args */ ){
+(function ( /* args */) {
 
-    KunSceneManager.Initialize();
+    KunScenes.manager();
 
     KunAnimations_RegisterManagers();
 
     KunAnimations_SetupCommands();
-})( /* initializer */ );
+})( /* initializer */);
 
 
 

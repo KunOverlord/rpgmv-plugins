@@ -4,7 +4,7 @@
 /*:
  * @filename KunItemCrafting.js
  * @plugindesc Provide an easy way to define an item crafting database
- * @version 1.7
+ * @version 1.8
  * @author Kun
  * 
  * @help
@@ -57,7 +57,7 @@
  * @desc Describe the database of crafting formulas
  * 
  * @param position
- * @text Recipe Position
+ * @text Recipe List Position
  * @type select
  * @option Left
  * @value left
@@ -147,7 +147,7 @@
  * @description KUN Modules
  * @type KUN
  */
-var KUN = KUN || {};
+//var KUN = KUN || {};
 
 
 function KunItemCrafting() {
@@ -165,9 +165,10 @@ KunItemCrafting.importParameters = function () {
  */
 KunItemCrafting.Initialize = function () {
 
-    var parameters = this.importParameters();
+    //var parameters = this.importParameters();
+    var parameters = this.PluginData();
 
-    this._debug = parameters.debug === 'true';
+    this._debug = parameters.debug;
     this._position = parameters.position || KunItemCrafting.Position.Center;
     this._sfx = {
         'success': parameters.successFx || '',
@@ -190,7 +191,7 @@ KunItemCrafting.Initialize = function () {
     this._messages = [];
     this._container = [];
 
-    return this.importRecipes(parameters.recipes.length > 0 ? JSON.parse(parameters.recipes) : []);
+    return this.importRecipes( parameters.recipes );
 };
 /**
  * @returns Boolean
@@ -499,17 +500,14 @@ KunItemCrafting.addItem = function (item, amount, notify) {
     }
 };
 /**
- * @param {String} input 
+ * @param {Object[]} recipes 
  * @returns Array
  */
-KunItemCrafting.importRecipes = function (input) {
-    (Array.isArray(input) ? input : []).filter(recipe => recipe.length > 0).map(recipe => JSON.parse(recipe)).forEach(function (formula) {
-        var recipe = new KunRecipe(
-            parseInt(formula.item_id),
-            parseInt(formula.amount),
-            parseInt(formula.level));
+KunItemCrafting.importRecipes = function (recipes) {
+    (Array.isArray(recipes) ? recipes : []).forEach(function (formula) {
+        var recipe = new KunRecipe( formula.item_id, formula.amount, formula.level);
 
-        (formula.recipe.length > 0 ? JSON.parse(formula.recipe) : []).map(item => parseInt(item)).forEach(function (item) {
+        (Array.isArray(formula.recipe) ? formula.recipe : [] ).forEach(function (item) {
             recipe.add(item);
         });
 
@@ -537,7 +535,38 @@ KunItemCrafting.DebugLog = function (message) {
     }
 };
 
+/**
+ * @returns Object
+ */
+KunItemCrafting.PluginData = function () {
+    function _parsePluginData ( key , value ) {
+        if (typeof value === 'string' && value.length ) {
+            try {
+                if (/^\{.*\}$|^\[.*\]$/.test(value)) {
+                    return JSON.parse(value, _parsePluginData );
+                }
+            } catch (e) {
+                // If parsing fails or it's not an object/array, return the original value
+            }
+            if( value === 'true' || value === 'false'){
+                return value === 'true';
+            }
+            if( !isNaN(value) ){
+                return parseInt(value);
+            }
+        }
+        else if( typeof value === 'object' && !Array.isArray(value) ){
+            var _output = {};
+            Object.keys( value ).forEach( function(key ){
+                _output[key] = _parsePluginData( key , value[key] );
+            });
+            return _output;
+        }
+        return value;
+    };
 
+    return _parsePluginData( 'KunItemCrafting', PluginManager.parameters('KunItemCrafting'));
+};
 
 
 

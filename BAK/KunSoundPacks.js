@@ -1,10 +1,10 @@
 //=============================================================================
-// KunSoundBanks.js
+// KunSoundPacks.js
 //=============================================================================
 /*:
- * @filename KunSoundBanks.js
+ * @filename KunSoundPacks.js
  * @plugindesc Create playable sound banks to randomize different Sound Effect outputs
- * @version 1.02
+ * @version 1.20
  * @author KUN
  * @target MC | MZ
  * 
@@ -12,20 +12,20 @@
  * 
  * COMMANDS:
  * 
- *      KunSoundBanks play [sound_bank_name] [wait_seconds] [random_elapsed_seconds]
- *          Play a sound bank selection by name
- *          Set wait seconds to include a time waiting pause before running the next events
- *          Add random elapsed seconds to define a randomized timespan
+ *      KunSoundPacks play [sound_bank_name] [fps] [import]
+ *          Play a sound bank selection by name. You can add more soundbanks separated by semi-colon (:) to allow random play.
+ *          Set wait FPS to include a time waiting pause before running the next events
+ *          Use import tag to define a Game Variable where to import the fps values from
  * 
- *      KunSoundBanks interrupt [on|off]
+ *      KunSoundPacks interrupt [on|off]
  *          Allow a sound bank selection to interrupt other Sound Effects playing by MEdia Player
  *          Activated by default for those sound banks marked with Allow SE interruption
  * 
- *      KunSoundBanks wait [elapsed_seconds] [random_elapsed_seconds]
- *          Wait for elapsed seconds before running the next routines in the event editor
- *          Add random elapsed seconds to define a randomized timespan
+ *      KunSoundPacks wait [fps] [import]
+ *          Wait for elapsed FPS before running the next routines in the event editor
+ *          Use import tag to define a Game Variable where to import the fps values from
  * 
- *      KunSoundBanks list
+ *      KunSoundPacks list
  *          Debug sound bank info
  * 
  * @param debug
@@ -34,17 +34,29 @@
  * @type boolean
  * @default false
  * 
- * @param soundBank
- * @type struct<SoundBank>[]
- * @text Sound Banks
- * @desc Define the list of Sound Effect Reactions and specific Framesets
+ * @param collections
+ * @text Collections
+ * @desc List all sound bank profiles here
+ * @type struct<Collection>[]
+ * 
  */
-/*~struct~SoundBank:
- *
+/*~struct~Collection:
+ * @param name
+ * @text Collection Name
+ * @desc Define a profile to group a list of sound packs
+ * @type text
+ * 
+ * @param packs
+ * @type struct<SoundPack>[]
+ * @text Sound Packs
+ * @desc Define the list of Sound Effects for this profile
+ * 
+ */
+/*~struct~SoundPack:
  * @param name
  * @text Name
  * @type text
- * @default new-sound-bank
+ * @default new-sound-pack
  * 
  * @param round
  * @text Rounds
@@ -62,7 +74,7 @@
  * @default 100
  * 
  * @param sfx
- * @text Sound Collection
+ * @text Sound Effects
  * @type file[]
  * @desc Add a selection of sound effects to play in this sound bank
  * @require 1
@@ -100,26 +112,50 @@
  *
  */
 
-//const { count } = require('console');
-
-/**
- * @description KUN Modules
- * @type KUN
- */
-var KUN = KUN || {};
-
 /**
  * 
  * @returns 
  */
-function KunSoundBanks() {
+function KunSoundPacks() {
     throw `${this.constructor.name} is a Static Class`;
 }
 /**
  * 
- * @returns KunSoundBanks
+ * @returns KunSoundPacks
  */
-KunSoundBanks.Initialize = function () {
+KunSoundPacks.Initialize = function () {
+
+    const parameters = this.PluginData()
+
+    this._debug = parameters.debug;
+
+    this._canInterrupt = true;
+
+    this._soundBanks = {};
+
+    parameters.collections.forEach( function( collection ){
+        collection.packs.forEach( function( pack ){
+            //console.log(pack);
+            var sb = new KunSoundBank(
+                collection.name.length ? collection.name + '-' + pack.name : pack.name,
+                pack.chance,
+                pack.interrupt,
+                pack.round || 0);
+                pack.pitch.forEach( pitch => sb.addPitch(pitch) );
+                pack.pan.forEach( pan => sb.addPan(pan ) );
+                pack.volume.forEach( volume => sb.addVol(volume) ) ;
+                pack.sfx.forEach( se => sb.addSe(se) );
+            KunSoundPacks.addBank(sb);    
+        });
+    });
+    //console.log( this._soundBanks );
+    //return this.ImportSoundBanks(parameters.soundBank.length > 0 ? JSON.parse(parameters.soundBank) : []);
+};
+/**
+ * 
+ * @returns KunSoundPacks
+ */
+KunSoundPacks.InitializeOLD = function () {
 
     var parameters = this.PluginParameters()
 
@@ -134,42 +170,49 @@ KunSoundBanks.Initialize = function () {
 /**
  * @returns Boolean
  */
-KunSoundBanks.canInterrupt = function () {
+KunSoundPacks.canInterrupt = function () {
     return this._canInterrupt;
 };
 /**
  * @param {Boolean} allow 
- * @returns KunSoundBanks
+ * @returns KunSoundPacks
  */
-KunSoundBanks.allowInterruption = function (allow) {
+KunSoundPacks.allowInterruption = function (allow) {
     this._canInterrupt = typeof allow === 'boolean' && allow;
     return this;
 };
 /**
  * @returns Boolean
  */
-KunSoundBanks.debug = function () {
+KunSoundPacks.debug = function () {
     return this._debug;
 };
 /**
  * @param {Boolean} list 
  * @returns Object | Object[]
  */
-KunSoundBanks.banks = function (list) {
+KunSoundPacks.banks = function (list) {
     return typeof list === 'boolean' && list ? Object.values(this._soundBanks) : this._soundBanks;
+};
+/**
+ * List all available sound banks
+ * @returns String[]
+ */
+KunSoundPacks.list = function(){
+    return Object.keys( this.banks( ) );
 };
 /**
  * @param {String} bank 
  * @returns Boolean
  */
-KunSoundBanks.hasBank = function (bank) {
+KunSoundPacks.hasBank = function (bank) {
     return typeof bank === 'string' && bank.length > 0 && this._soundBanks.hasOwnProperty(bank);
 };
 /**
  * @param {KunSoundBank} bank 
- * @returns KunSoundBanks
+ * @returns KunSoundPacks
  */
-KunSoundBanks.addBank = function (bank) {
+KunSoundPacks.addBank = function (bank) {
     //console.log( bank );
     if (bank instanceof KunSoundBank && !this.hasBank(bank.name())) {
         this._soundBanks[bank.name()] = bank;
@@ -180,15 +223,15 @@ KunSoundBanks.addBank = function (bank) {
  * @param {String} bank 
  * @returns KunSoundBank
  */
-KunSoundBanks.get = function (bank) {
+KunSoundPacks.get = function (bank) {
     return this.hasBank(bank) ? this.banks()[bank] : KunSoundBank.Empty();
 };
 /**
  * @param {String} bank 
  * @param {Number} round
- * @returns KunSoundBanks
+ * @returns KunSoundPacks
  */
-KunSoundBanks.play = function (bank , round ) {
+KunSoundPacks.play = function (bank , round ) {
     //console.log( bank );
     if (this.hasBank(bank)) {
         if( typeof round === 'number' && round > 0 ){
@@ -203,14 +246,46 @@ KunSoundBanks.play = function (bank , round ) {
 /**
  * 
  */
-KunSoundBanks.PluginParameters = function () {
-    return PluginManager.parameters('KunSoundBanks');
+KunSoundPacks.PluginParameters = function () {
+    return PluginManager.parameters('KunSoundPacks');
+};
+/**
+ * 
+ */
+KunSoundPacks.PluginData = function () {
+    function _parsePluginData ( key , value ) {
+        if (typeof value === 'string' && value.length ) {
+            try {
+                if (/^\{.*\}$|^\[.*\]$/.test(value)) {
+                    return JSON.parse(value, _parsePluginData );
+                }
+            } catch (e) {
+                // If parsing fails or it's not an object/array, return the original value
+            }
+            if( value === 'true' || value === 'false'){
+                return value === 'true';
+            }
+            if( !isNaN(value) ){
+                return parseInt(value);
+            }
+        }
+        else if( typeof value === 'object' && !Array.isArray(value) ){
+            var _output = {};
+            Object.keys( value ).forEach( function(key ){
+                _output[key] = _parsePluginData( key , value[key] );
+            });
+            return _output;
+        }
+        return value;
+    };
+
+    return _parsePluginData( 'KunSoundPacks', PluginManager.parameters('KunSoundPacks'));
 };
 /**
  * @param {Object[]} input 
- * @returns KunSoundBanks
+ * @returns KunSoundPacks
  */
-KunSoundBanks.ImportSoundBanks = function (input) {
+KunSoundPacks.ImportSoundBanks = function (input) {
     (input).map(sb => sb.length > 0 ? JSON.parse(sb) : null).forEach(function (bank) {
         var sb = new KunSoundBank(bank.name, bank.chance, bank.interrupt === 'true', parseInt(bank.round || 0));
         //console.log( sb.name() );
@@ -226,7 +301,7 @@ KunSoundBanks.ImportSoundBanks = function (input) {
         (bank.sfx.length > 0 ? JSON.parse(bank.sfx) : []).forEach(function (se) {
             sb.addSe(se);
         });
-        KunSoundBanks.addBank(sb);
+        KunSoundPacks.addBank(sb);
     });
     return this;
 };
@@ -238,43 +313,43 @@ KunSoundBanks.ImportSoundBanks = function (input) {
  * @param {Number} pan 
  * @param {Boolean} interrupt
  */
-KunSoundBanks.AudioManager = function (se, volume, pitch, pan, interrupt) {
+KunSoundPacks.AudioManager = function (se, volume, pitch, pan, interrupt) {
     if (se.length) {
         if (typeof interrupt === 'boolean' && interrupt) {
             AudioManager.stopSe();
         }
-        //KunSoundBanks.DebugLog( `Playing ${se} at vol ${volume}, pitch ${pitch} and pan ${pan} ${interrupt}` );
+        //KunSoundPacks.DebugLog( `Playing ${se} at vol ${volume}, pitch ${pitch} and pan ${pan} ${interrupt}` );
         AudioManager.playSe({ name: se, pan: pan || 0, pitch: pitch || 100, volume: volume || 90 });
     }
 };
 /**
  * @param {String} message 
  */
-KunSoundBanks.DebugLog = function (message) {
+KunSoundPacks.DebugLog = function (message) {
     if (this.debug()) {
-        console.log(typeof message === 'object' ? message : `[ KunSoundBanks ] ${message.toString()}`);
+        console.log(typeof message === 'object' ? message : `[ KunSoundPacks ] ${message.toString()}`);
     }
 };
 /**
  * @param {String} name 
  * @returns Boolean
  */
-KunSoundBanks.SoundEffectExists = function (name) {
+KunSoundPacks.SoundEffectExists = function (name) {
     return this.FileExists(this.FilePath(name + AudioManager.audioFileExt()));
 }
 /**
  * @param {String} path 
  * @returns Boolean
  */
-KunSoundBanks.FileExists = function (path) {
+KunSoundPacks.FileExists = function (path) {
 
     var fs = require('fs');
     if (fs.existsSync(path)) {
         return true;
     }
 
-    if (KunSoundBanks.debug(KunSoundBanks.DebugMode().TraceLog)) {
-        KunSoundBanks.DebugLog(`File missing ${path}`);
+    if (KunSoundPacks.debug(KunSoundPacks.DebugMode().TraceLog)) {
+        KunSoundPacks.DebugLog(`File missing ${path}`);
     }
 
     return false;
@@ -283,7 +358,7 @@ KunSoundBanks.FileExists = function (path) {
  * @param {String} file 
  * @returns String
  */
-KunSoundBanks.FilePath = function (file) {
+KunSoundPacks.FilePath = function (file) {
     var path = require('path');
     var base = path.dirname(process.mainModule.filename);
     return path.join(base, `audio/se/${file}`);
@@ -327,7 +402,7 @@ KunSoundBank.prototype.round = function () {
  * @returns Boolean
  */
 KunSoundBank.prototype.interrupt = function () {
-    return this._interrupt && KunSoundBanks.canInterrupt();
+    return this._interrupt && KunSoundPacks.canInterrupt();
 };
 /**
  * @returns Number
@@ -438,7 +513,7 @@ KunSoundBank.prototype.play = function () {
     if (this.canPlay() && this.chance()) {
         var selection = this.select();
         if (selection.length) {
-            KunSoundBanks.AudioManager(selection, this.volume(), this.pitch(), this.pan(), this.interrupt());
+            KunSoundPacks.AudioManager(selection, this.volume(), this.pitch(), this.pan(), this.interrupt());
         }
     }
     return this;
@@ -473,19 +548,19 @@ function KunSoundBanks_SetupCommands() {
     var _KunSoundBanks_SetupCommands = Game_Interpreter.prototype.pluginCommand;
     Game_Interpreter.prototype.pluginCommand = function (command, args) {
         _KunSoundBanks_SetupCommands.call(this, command, args);
-        if (command === 'KunSoundBanks' && args.length > 0) {
+        if (command === 'KunSoundPacks' && args.length > 0) {
             switch (args[0]) {
                 case 'play':
                     if (args.length > 1) {
                         var bank = args[1].split(':');
-                        KunSoundBanks.play( bank.length > 1 ? bank[ Math.floor(Math.random() * bank.length) ] : bank[0]);
+                        KunSoundPacks.play( bank.length > 1 ? bank[ Math.floor(Math.random() * bank.length) ] : bank[0]);
                         if (args.length > 2) {
                             var wait = parseInt(args[2]);
                             if( args.length > 3 && args[3] === 'import' && wait > 0 ){
                                 wait = $gameVariables.value( wait );
                             }
                             this.wait( wait );
-                            KunSoundBanks.DebugLog(`Waiting ${wait} fps ...`);    
+                            KunSoundPacks.DebugLog(`Waiting ${wait} fps ...`);    
                         }
                     }
                     break;
@@ -496,14 +571,14 @@ function KunSoundBanks_SetupCommands() {
                             wait = $gameVariables.value(wait);
                         }
                         this.wait(wait);
-                        KunSoundBanks.DebugLog(`Waiting ${wait} fps ...`);
+                        KunSoundPacks.DebugLog(`Waiting ${wait} fps ...`);
                     }
                     break;
                 case 'interrupt':
-                    KunSoundBanks.allowInterruption(args.length > 1 && args[1] === 'on');
+                    KunSoundPacks.allowInterruption(args.length > 1 && args[1] === 'on');
                     break;
                 case 'list':
-                    KunSoundBanks.banks(true);
+                    KunSoundPacks.banks(true);
                     break;
             }
         }
@@ -518,7 +593,7 @@ function KunSoundBanks_SetupCommands() {
 
 (function ( /* args */) {
 
-    KunSoundBanks.Initialize();
+    KunSoundPacks.Initialize();
 
     KunSoundBanks_SetupCommands();
 })( /* initializer */);

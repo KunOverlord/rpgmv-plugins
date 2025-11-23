@@ -1,0 +1,2855 @@
+//=============================================================================
+// KunAnimations.js
+//=============================================================================
+/*:
+ * @filename KunAnimations.js
+ * @plugindesc Kun Interactive Picture Animations - Animate pictures with custom framesets and commands, now featuring an interactive framework to click over specific hotspots depending on the frameset running.
+ * @version 2.2
+ * @author KUN
+ * @target MC | MZ
+ * 
+ * @help
+ * 
+ * COMMANDS:
+ * 
+ *      KunAnimations start animation-name [setName]
+ *          Switch animation frameset setName for animation-name
+ * 
+ *      KunAnimations set animation-name [setName] [wait frames:frame_offset]
+ *          Switch animation frameset setName for animation-name
+ *          wait frames will pause the interpreter for the defined frames before going on
+ *          frame_offset will add random frames from [frames] to [frames + frame_offset]
+ * 
+ *      KunAnimations reset animation-name [replay]
+ *          Resets the given animation
+ *          Restarts the controller if replay is required
+ * 
+ *      KunAnimations fps animation-name [fps] [import]
+ *          Set custom frames per second for the playing animation-name. Define import to use a Game Variable to grab the fps from
+ * 
+ *      KunAnimations pause animation-name
+ *          Pause animation-name if playing
+ * 
+ *      KunAnimations resume animation-name
+ *          Resume animation-name if paused
+ * 
+ *      KunAnimations target [random]
+ *          Update to the next target in the list of touched spots
+ * 
+ *      KunAnimations mode [capture|touch|disabled]
+ *          Set the mouse interactive mode. Set touch to activate the interactive events. Set capture to describe hotspot areas in the console (requires debug mode on). Set disable to turn off the event listener.
+ * 
+ *      KunAnimations clear [targets | alias]
+ *          Clear the current target queue
+ *          Clear targets or defined aliases
+ * 
+ *      KunAnimations alias [alias_name] [animation_name]
+ *          Create an alias for a specific animation controller to ease picture swapping with the same tags
+ * 
+ *      KunAnimations play [sound_bank_name] [wait_seconds] [random_elapsed_seconds]
+ *          Play a sound bank selection by name
+ *          Set wait seconds to include a time waiting pause before running the next events
+ *          Add random elapsed seconds to define a randomized timespan
+ * 
+ *      KunAnimations interruption [on|off]
+ *          Allow a sound bank selection to interrupt other Sound Effects playing by MEdia Player
+ *          Activated by default for those sound banks marked with Allow SE interruption
+ * 
+ *      KunAnimations wait [elapsed_seconds] [random_elapsed_seconds]
+ *          Wait for elapsed seconds before running the next routines in the event editor
+ *          Add random elapsed seconds to define a randomized timespan
+ * 
+ * 
+ * HIERARCHY:
+ * 
+ *  -> Scene
+ *  ----> Actions (start)
+ *  ----> Animation
+ *  --------> NextAnimations
+ *  --------> Conditions
+ *  --------> TouchSpot
+ *  ------------> Actions
+ *  ------------> Conditions
+ * 
+ *  - Animation Controllers
+ *    defined by the Selected Picture File.
+ *    Here you can setup the columns and rows, to properly display the frames.
+ * 
+ *  - Animation Frameset Groups
+ *    A list of frames to play, with a custom FPS, behavior and looping iterations.
+ * 
+ *  - Touch Spots
+ *    Every frameset animates a list of frames, but you can define on these a list of specific spots
+ *    to click and cause a reaction, update a Game Variable, play a custom sound effect,
+ *    and change to another specific frameset.
+ * 
+ * 
+ * @param debug
+ * @text Debug Level
+ * @desc Show debug info. Activate Trace Log to detail the imports and exports of data.
+ * @type select
+ * @option TraceLog
+ * @value 2
+ * @option Enabled
+ * @value 1
+ * @option Disabled
+ * @value 0
+ * @default 0
+ * 
+ * @param defaultFPS
+ * @text Master Frame Time
+ * @desc default frame time
+ * @type number
+ * @min 1
+ * @default 10
+ * 
+ * @param touchVarCounter
+ * @text Touch Counter Variable
+ * @desc This variable handles the counter of enqueued interactions performed by the player
+ * @type variable
+ * @min 0
+ * @default 0
+ * 
+ * @param touchVarLimit
+ * @parent touchVar
+ * @text Touch Limit Variable
+ * @desc How many interactions can be saved in the queue. Can be updated in game to increase the touch events.
+ * @type variable
+ * @min 0
+ * @default 0
+ * 
+ * @param touchMode
+ * @parent touchVar
+ * @text Touch Mode Switch
+ * @desc Use it to keep control of the interactive mode in the event editor. Use KunAnimations mode touch | disable to change it.
+ * @type switch
+ * @default 0
+ * 
+ * @param touchX
+ * @text Touch X Var
+ * @type variable
+ * @min 0
+ * @default 0
+ * 
+ * @param touchY
+ * @text Touch Y Var
+ * @type variable
+ * @min 0
+ * @default 0
+ * 
+ * @param touchSfx
+ * @text Default Touch SE
+ * @desc Define a default sound effect
+ * @type file
+ * @require 1
+ * @dir audio/se/
+ * 
+ * @param cancelSfx
+ * @text Don't Touch SE
+ * @desc Define a no touch sound effect
+ * @type file
+ * @require 1
+ * @dir audio/se/
+ * 
+ * @param controllers
+ * @type struct<Scene>[]
+ * @text Scene Collection
+ * @desc Define the DataBase of Animation Scenes (keep it clean and easy!!)
+ * 
+ */
+/*~struct~Scene:
+ *
+ * @param source
+ * @text Source Picture Pack
+ * @desc Add one or more source pictures with the same frameset columns and rows, to use with the same animation rules. Duplicated pictures will be discarded.
+ * @type file[]
+ * @require 1
+ * @dir img/pictures/
+ * 
+ * @param cols
+ * @text Columns
+ * @type number
+ * @min 1
+ * @max 32
+ * @default 1
+ * 
+ * @param rows
+ * @text Rows
+ * @type number
+ * @min 1
+ * @max 32
+ * @default 1
+ * 
+ * @param fps
+ * @text Frames Per Second
+ * @desc Default FPS for this frameset (leave to 0 to get master FPS as default)
+ * @type number
+ * @min 0
+ * @default 0
+ * 
+ * @param framesets
+ * @type struct<Animation>[]
+ * @text Animations
+ * @desc Animation Frameset Collection
+ * 
+ * @param hotspots
+ * @type struct<Spot>[]
+ * @text Event Hotspots
+ * @desc Add the interactive spots here
+ * @default []
+ * 
+ * @param soundCollection
+ * @type text[]
+ * @text Sound Collection
+ * @desc Add here the sound bank prefix for each picture souce when required
+ * 
+ * @param actions
+ * @type struct<Action>[]
+ * @text Start Actions
+ * @desc Run these actions on start
+ * @default []
+ */
+/*~struct~Animation:
+ * 
+ * @param name
+ * @text Name
+ * @type text
+ * @default new-animation
+ * 
+ * @param frames
+ * @text FrameSet
+ * @type number[]
+ * @min 0
+ * @desc List of frames to play in this animation
+ * 
+ * @param type
+ * @parent frames
+ * @text Animation Type
+ * @type select
+ * @option Forward (default)
+ * @value forward
+ * @option Reverse
+ * @value reverse
+ * @option Ping-Pong
+ * @value ping-pong
+ * @option Static
+ * @value static
+ * @default forward
+ * 
+ * @param fps
+ * @parent frames
+ * @text Frames Per Second
+ * @desc Default FPS for this frameset (leave to 0 to get master FPS as default)
+ * @type number
+ * @min 0
+ * @default 0
+ * 
+ * @param loops
+ * @parent frames
+ * @type number
+ * @text Loops
+ * @desc number of times the animation will play before switching to the next animation. Leave it to 0 for endless loops (no next animation)
+ * @default 0
+ * 
+ * @param next
+ * @parent frames
+ * @text Next Layer
+ * @type text[]
+ * @desc Define the next frameset to call. If more than one specified, they will be randomly called
+ * 
+ * @param offsetX
+ * @text X Offset
+ * @type number
+ * @default 0
+ * 
+ * @param offsetY
+ * @text Y Offset
+ * @type number
+ * @default 0
+ * 
+ * @param spots
+ * @type struct<TouchSpot>[]
+ * @text Touch Spots
+ * @desc Interactive Spots to fire events
+ * @default []
+ * 
+ * @param conditions
+ * @type struct<Condition>[]
+ * @text Conditions
+ * @desc Run this animation when meeting these conditions
+ * @default []
+ *  
+ * @param sounds
+ * @text Sound Packs
+ * @desc Play one of these sound collections each time this animation is played. Requires KunSoundPacks.
+ * @type text[]
+ * @default []
+ * 
+ */
+/*~struct~TouchSpot:
+ * 
+ * @param name
+ * @text Name
+ * @desc Bind here a Spot when hitting a specific area in the animation. Must be an existing valid HotSpot
+ * @type text
+ * @default touch-here
+ * 
+ * @param next
+ * @text Next Animation(s)
+ * @desc Jump to any of these animations on touched (allow mrandom options when more than 1)
+ * @type text[]
+ * @default []
+ * 
+ */
+/*~struct~Spot:
+ * 
+ * @param name
+ * @text Name
+ * @type text
+ * @default touch-here
+ * 
+ * @param x1
+ * @text X1
+ * @type number
+ * @min 0
+ * @desc X origin coordinate
+ * 
+ * @param y1
+ * @text Y1
+ * @type number
+ * @min 0
+ * @desc Y origin coordinate
+ * 
+ * @param x2
+ * @text X2
+ * @type number
+ * @min 0
+ * @desc X destination coordinate
+ * 
+ * @param y2
+ * @text Y2
+ * @type number
+ * @min 0
+ * @desc Y destination coordinate
+ * 
+ * @param trigger
+ * @text On Click
+ * @type select
+ * @desc Define the behaviour on touching this Spot
+ * @option Instant Run
+ * @value instant
+ * @option Queue
+ * @value queue
+ * @option Next Frame
+ * @value frame
+ * @option Ignore
+ * @value ignore
+ * @default queue
+ * 
+ * @param actions
+ * @type struct<Action>[]
+ * @text Actions
+ * @desc Run these Actions on activating this Spot
+ * @default []
+ *  
+ * @param conditions
+ * @type struct<Condition>[]
+ * @text Conditions
+ * @desc Enable this HotSpot when meeting these conditions
+ * @default []
+ */
+/*~struct~Action:
+ * @param var
+ * @type variable
+ * @text Game Variable
+ * @desc define a game variable to update with this action
+ * @min 0
+ * @default 0
+ * 
+ * @param op
+ * @text Operator
+ * @desc Operation type to run on the Game Variable
+ * @type select
+ * @option Add
+ * @value add
+ * @option Sub
+ * @value sub
+ * @option Set
+ * @value set
+ * @default set
+ * 
+ * @param val
+ * @text Value
+ * @desc Value to update the game variable with
+ * @type number[]
+ * @min 0
+ * @default ["0"]
+ * 
+ * @param on
+ * @type switch[]
+ * @text Game Switch On
+ * @desc define a list of game switches to activate when running this animation layer
+ * @min 0
+ * @default []
+ * 
+ * @param off
+ * @type switch[]
+ * @text Game Switch Off
+ * @desc define a list of game switches to disable when running this animation layer
+ * @min 0
+ * @default []
+ * 
+ * @param se
+ * @type file
+ * @require 1
+ * @dir audio/se/
+ * @text Sound Effect
+ * @desc play a sound effect when running this action
+ * 
+ */
+/*~struct~Condition:
+ *
+ * @param sw
+ * @type switch
+ * @text Game Switch
+ * @desc define a game switch to check for this condition
+ * @default 0
+ *
+ * @param var
+ * @type variable
+ * @text Game Variable
+ * @desc define a game variable to check for this condition
+ * @min 0
+ * @default 0
+ * 
+ * @param op
+ * @text Operator
+ * @desc Select the type of operation to cast over the value for this Game Variable
+ * @type select
+ * @option Greater
+ * @value greater
+ * @option Greater or equal
+ * @value greater_equal
+ * @option Equal
+ * @value equal
+ * @option Less or equal
+ * @value less_equal
+ * @option Less
+ * @value less
+ * 
+ * @param val
+ * @type number
+ * @text Value
+ * @desc Operate with this value
+ * @min 0
+ * @default 0
+ * 
+ * @param target
+ * @type boolean
+ * @text Value as Variable
+ * @desc Map value as a Game Variable which provides the real value. Value must be a valid Game Variable.
+ * @default false
+ */
+
+
+//const { count } = require('console');
+
+/**
+ * 
+ * @returns 
+ */
+function KunSceneManager() {
+    throw `${this.constructor.name} is a Static Class`;
+}
+/**
+ * 
+ * @returns KunSceneManager
+ */
+KunSceneManager.Initialize = function(){
+
+    var parameters = KunSceneImporter.PluginData();
+
+    this._debug =  parameters.debug;
+    this._fps = parameters.defaultFPS;
+    this._touchVar = parameters.touchVarCounter;
+    this._limitVar = parameters.touchVarLimit;
+    this._touchMode = parameters.touchMode;
+
+    this._varX = parameters.touchX;
+    this._varY = parameters.touchY;
+    this._sfx = {
+        'touch': parameters.touchSfx || '',
+        'cancel': parameters.cancelSfx || '',
+    };
+
+
+    this._mode = KunSceneManager.Mode().Disabled;
+    this._soundBanks = {};
+    this._scenes = {};
+    //this._overrides = {};
+    this._alias = {};
+    this._targets = [];
+
+    this._breakInterrupt = false;
+
+    KunSceneImporter.import( parameters.controllers );
+
+    return this;
+};
+/**
+ * @returns Object
+ */
+KunSceneManager.DebugMode = function(){
+    return {
+        'Disabled':0,
+        'Enabled': 1,
+        'TraceLog': 2,
+    };
+};
+/**
+ * 
+ * @param {Boolean} stop 
+ */
+KunSceneManager.stopInterruption = function( stop ){
+    this._breakInterrupt = typeof stop === 'boolean' && stop;
+    return this.canInterrupt();
+};
+/**
+ * @returns Boolean
+ */
+KunSceneManager.canInterrupt = function(){
+    return !this._breakInterrupt;
+};
+    /**
+     * @returns Boolean
+     */
+    KunSceneManager.debug = function( level ){
+        if( typeof level === 'number' && level > 0 ){
+            return this._debug >= level;
+        }
+        return this._debug > KunSceneManager.DebugMode().Disabled;
+    };
+    /**
+     * @param {String} bank 
+     * @param {Number} round
+     * @returns KunSceneManager
+     */
+    KunSceneManager.playSound = function( collection , round ){
+        if( typeof KunSoundPacks === 'function' && typeof collection === 'string' && collection.length ){
+            KunSceneManager.DebugLog( `Playing Sound Collection: ${collection}` );
+            KunSoundPacks.play( collection , round );
+        }
+        return this;
+    };
+    /**
+     * 
+     * @param {String} alias 
+     * @param {String} original 
+     * @returns KunSceneManager
+     */
+    KunSceneManager.setAlias = function( alias , original ){
+        this._alias[alias] = original;
+        return this;
+    };
+    /**
+     * @param {String} alias 
+     * @returns String
+     */
+    KunSceneManager.getAlias = function( alias ){
+        return this._alias.hasOwnProperty(alias) ? this._alias[alias] : alias;
+    }
+    /**
+     * 
+     * @returns KunSceneManager
+     */
+    KunSceneManager.clearAlias = function(){
+        this._alias = {};
+        return this;
+    };
+    /**
+     * @param {String} mode 
+     * @returns KunSceneManager
+     */
+    KunSceneManager.setMode = function( mode ){
+        this._mode = mode;
+        switch( this._mode ){
+            case KunSceneManager.Mode().Capture:
+            case KunSceneManager.Mode().Touch:
+                this.unlock(true);
+                break;
+            case KunSceneManager.Mode().Disabled:
+            default:
+                this.clearTargets().lock();
+                break;
+        }
+        return this;
+    };
+    /**
+     * @returns Object
+     */
+    KunSceneManager.dump = function(){
+        return this;
+    }
+    /**
+     * @returns String
+     */
+    KunSceneManager.sfx = function( name ){
+        return typeof name === 'string' && name.length && this._sfx.hasOwnProperty(name) ? this._sfx[name] : this._sfx.touch;
+    };
+    /**
+     * @returns Number
+     */
+    KunSceneManager.limit = function(){
+        return this._limitVar > 0 ? $gameVariables.value( this._limitVar ) : 1;
+    };
+    /**
+     * @param {Boolean} unlock
+     * @returns KunSceneManager
+     */
+    KunSceneManager.unlock = function( unlock ){
+        if( this._touchMode ){
+            $gameSwitches.setValue( this._touchMode, typeof unlock === 'boolean' && unlock );
+        }
+        return this;
+    };
+    /**
+     * @returns KunSceneManager
+     */
+    KunSceneManager.lock = function( ){
+        return this.unlock(false);
+    };
+    /**
+     * @returns Boolean
+     */
+    KunSceneManager.locked = function(){
+        return this._mode === KunSceneManager.Mode().Disabled;
+        return this._touchMode > 0 && !$gameSwitches.value(this._touchMode);
+    };
+    /**
+     * @param {String} name 
+     * @returns Object {X,Y}
+     */
+    KunSceneManager.offset = function( name ){
+        var picture = this.get(name);
+        if( picture !== null ){
+            var layer = picture.current();
+            if( layer !== null ){
+                return {
+                    'x':layer.offsetX(),
+                    'y':layer.offsetY()
+                };
+            }
+        }
+        return {'x':0,'y':0};
+    };
+    /**
+     * @param {String} picture
+     * @param {String} spot
+     * @param {Number} x 
+     * @param {Number} y 
+     * @returns Boolean
+     */
+    KunSceneManager.enqueue = function( picture , spot , x , y ){
+        if( this.targets().length < this.limit() ){
+            this.targets().push({
+                'scene':picture,
+                'spot': spot,
+                'x':x,
+                'y':y,
+            });
+            this.updateTouchPoints( this.countTargets()).playFx();
+            return true;
+        }
+        else{
+            KunSceneManager.PlayFX(this.sfx('cancel'));
+        }
+        return false;
+    };
+    /**
+     * @returns Array
+     */
+    KunSceneManager.targets = function(){
+        return this._targets;
+    };
+    /**
+     * @returns Number
+     */
+    KunSceneManager.countTargets = function(){
+        return this._targets.length;
+    }
+    /**
+     * 
+     * @returns KunSceneManager
+     */
+    KunSceneManager.clearTargets = function(){
+        this._targets = [];
+        return this.updateTouchPoints();
+    };
+    /**
+     * @param {Boolean} random 
+     * @returns Object
+     */
+    KunSceneManager.nextSpot = function( random ){
+        var spot = typeof random === 'boolean' && random && this.countTargets() > 1 ?
+            this.targets().splice( Math.floor(Math.random() * this.countTargets( ) ), 1) :
+            this.targets().shift();
+        return Array.isArray(spot) ? spot[0] : spot;
+    };
+    /**
+     * @param {Boolean} random
+     * @returns KunSceneManager
+     */
+    KunSceneManager.target = function( random ){
+        if(this.countTargets()){
+            var touch = this.nextSpot( random );
+            //console.log(spot);
+            var scene = this.get(touch.scene);
+            if( scene !== null ){
+                var fs = scene.current();
+                if( fs !== null ){
+                        var target = fs.getSpot(touch.spot);
+                        if( target !== null ){
+                            target.update();
+                            //export X and Y positions
+                            this.exportPosition( touch.x , touch.y );
+                            //jump to next frameset (if any)
+                            if( target.nextLayers().length){
+                                //console.log( target.name(), target.nextLayers());
+                                scene.changeLayer( scene.selectLayer( target.nextLayers() , true ) , true );
+                            }
+                            //this.selectLayer( this.current().next() , true )
+                            //scene.changeLayer( target.next() , true );
+                        }
+                }
+                else{
+                    KunSceneManager.DebugLog(`Invalid FrameSet ${touch.spot}`);    
+                }
+            }
+            else{
+                KunSceneManager.DebugLog(`Invalid Controller ${touch.scene}`);
+            }
+        }    
+        return this.updateTouchPoints(this.countTargets());
+    };
+    /**
+     * @param {String} picture 
+     * @returns KunSceneManager
+     */
+    KunSceneManager.randomTarget = function( picture ){
+        var scene = this.get(picture);
+        if( scene !== null ){
+            var layer = scene.current();
+            if( layer !== null ){
+                var spot = layer.randomSpot();
+                if( spot !== null ){
+                    var pos = spot.generatePosition( );
+                    this.exportPosition( pos.x , pos.y );
+                }
+            }
+        }
+        return this;
+    };
+    /**
+     * @param {Number} x 
+     * @param {Number} y 
+     * @returns KunSceneManager
+     */
+    KunSceneManager.exportPosition = function( x  , y ){
+        if( this._varX > 0 ){
+            $gameVariables.setValue(this._varX,x);
+        }
+        if( this._varY > 0 ){
+            $gameVariables.setValue(this._varY,y);
+        }
+        //KunSceneManager.DebugLog(`Event Clicked on ${x},${y}`);
+        return this;
+    };
+    /**
+     * @param {Number} counter 
+     * @returns KunSceneManager
+     */
+    KunSceneManager.updateTouchPoints = function( counter ){
+        if( this._touchVar > 0 ){
+            $gameVariables.setValue(this._touchVar , counter  || 0 );
+        }
+        return this;
+    };
+    /**
+     * @returns Boolean
+     */
+    KunSceneManager.canCapture = function(){
+        return this._mode === KunSceneManager.Mode().Capture;
+    };
+    /**
+     * @returns Boolean
+     */
+    KunSceneManager.canTouch = function(){
+        return this._mode === KunSceneManager.Mode().Touch && !this.locked();
+    };
+    /**
+     * @returns String
+     */
+    KunSceneManager.mode = function(){
+        return this._mode;
+    };
+    /**
+     * @returns Number
+     */
+    KunSceneManager.defaultFps = function(){
+        return this._fps;
+    };
+    /**
+     * @returns Array | Object
+     */
+    KunSceneManager.scenes = function( list ){
+        return typeof list === 'boolean' && list ? Object.values(this._scenes) : this._scenes;
+    };
+    /**
+     * @returns Array
+     */
+    KunSceneManager.list = function( ){
+        return Object.keys( this._scenes );
+    };
+    /**
+     * @param {KunScene} controller 
+     * @returns KunSceneManager
+     */
+    KunSceneManager.addScene = function( controller ){
+        if( controller instanceof KunScene && !this.has(controller.name()) ){
+            this._scenes[controller.name()] = controller;
+        }
+        return this;
+    };
+    /**
+     * @param {String} name 
+     * @returns Boolean
+     */
+    KunSceneManager.has = function( name ){
+        return this._scenes.hasOwnProperty( name );
+    }
+    /**
+     * @param {String} name 
+     * @returns Boolean
+     */
+    KunSceneManager.isPlaying = function( name ){
+        return this.has( name ) && this.get( name ).playing();
+    };
+    /**
+     * @returns Array
+     */
+    KunSceneManager.controllers = function( list ){
+        return typeof list === 'boolean' && list ? Object.values( this._scenes ) : this._scenes;
+    };
+    /**
+     * @param {String} pictureName 
+     * @returns {KunScene}
+     */
+    KunSceneManager.get = function( pictureName ){
+        return this.has( pictureName ) ? this._scenes[pictureName] : null;
+    }
+    /**
+     * @param {String} pictureName 
+     * @returns {KunScene}
+     */
+    KunSceneManager.scene = function( pictureName ){
+        return this.has( pictureName ) ? this._scenes[pictureName] : KunScene.INVALID;
+    }
+    /**
+     * @param {String} pictureName 
+     * @returns {KunSceneManager}
+     */
+    KunSceneManager.stop = function( pictureName ){
+        return this;
+    };
+    /**
+     * @param {String} picturename 
+     * @param {Boolean} replay
+     * @returns KunSceneManager
+     */
+    KunSceneManager.reset = function( picturename , replay  ){
+        if( this.has( picturename)){
+            this.get(picturename).first().reset( typeof replay === 'boolean' && replay );
+        }
+        return this;
+    }
+    /**
+     * @param {String} pictureName 
+     * @returns {KunSceneManager}
+     */
+    KunSceneManager.resume = function( pictureName ){
+        return this;
+    };
+    /**
+     * @param {String} pictureName 
+     * @param {String} layerName 
+     * @param {Boolean} runActions
+     * @returns {KunSceneManager}
+     */
+    KunSceneManager.overrideSet = function( pictureName , layerName , runActions ){
+        if( this.isPlaying( pictureName)){
+            this._scenes[ pictureName ].changeLayer(layerName, true ) ;
+            if( KunSceneManager.debug( KunSceneManager.DebugMode().TraceLog ) ){
+                KunSceneManager.DebugLog(`Playing ${pictureName}.${layerName}`);
+            }    
+            
+            this.updateTouchPoints(this.countTargets());
+            if( typeof runActions === 'boolean' && runActions ){
+                //console.log( this._scenes[ pictureName ].actions(true));
+                this._scenes[ pictureName ].runActions();
+            }
+        }
+        else if(KunSceneManager.debug( )){
+            KunSceneManager.DebugLog(`${pictureName}.${layerName} is not playing in the current scene`);
+        }
+        return this;
+    };
+    /**
+     * 
+     * @param {String} pictureName 
+     * @param {Number} fps 
+     * @returns {KunSceneManager}
+     */
+    KunSceneManager.overrideFPS = function( pictureName , fps ){
+        if( this.isPlaying( pictureName ) ){
+            this._scenes[ pictureName ].setFps( fps );
+        }
+        return this;
+    };
+    /**
+     * @param {String} sfx
+     * @returns KunSceneManager
+     */
+    KunSceneManager.playFx = function( sfx ){
+        KunSceneManager.PlayFX( typeof sfx === 'string' && sfx.length ? sfx : this.sfx() );
+        return this;
+    };
+
+/*KunSceneManager.PluginParameters = function(){
+    return PluginManager.parameters('KunAnimations');
+};*/
+
+
+/**
+ * @param {String} sfx 
+ * @param {Number} pitch
+ * @param {Number} pan
+ */
+KunSceneManager.PlayFX = function( sfx , pitch , pan ){
+        if(  sfx.length ){
+            if( typeof pitch !== 'number' ){
+                pitch = 90 + Math.floor(Math.random() * 20);
+            }
+            if( typeof pan !== 'number' ){
+                pan = Math.floor(Math.random() * 20) - 10;
+            }
+            this.AudioManager( sfx , 100 , pitch , pan );
+            //AudioManager.playSe({name: sfx , pan: pan, pitch: pitch, volume: 100});
+        }
+};
+/**
+ * 
+ * @param {String} se 
+ * @param {Number} volume 
+ * @param {Number} pitch 
+ * @param {Number} pan 
+ * @param {Boolean} interrupt
+ */
+KunSceneManager.AudioManager = function( se , volume , pitch , pan , interrupt ){
+    if( se.length ){
+        if( typeof interrupt === 'boolean' && interrupt ){
+            AudioManager.stopSe();
+        }
+        //KunSceneManager.DebugLog( `Playing ${se} at vol ${volume}, pitch ${pitch} and pan ${pan} ${interrupt}` );
+        AudioManager.playSe({name: se , pan: pan || 0, pitch: pitch || 100, volume: volume || 90 } );
+    }
+};
+/**
+ * @param {String} message 
+ */
+KunSceneManager.DebugLog = function( message ){
+    if( KunSceneManager.debug() ){
+        console.log( typeof message === 'object' ? message : `[ KunSceneManager ] ${message.toString()}` );
+    }
+};
+/**
+ * @param {String} name 
+ * @returns Boolean
+ */
+/*KunSceneManager.SoundEffectExists = function( name ){
+    return this.FileExists( this.FilePath( name + AudioManager.audioFileExt() ) );
+}*/
+/**
+ * @param {String} path 
+ * @returns Boolean
+ */
+/*KunSceneManager.FileExists = function( path ){
+
+    var fs = require('fs');
+    if( fs.existsSync( path )){
+        return true;
+    }
+
+    if( KunSceneManager.debug( KunSceneManager.DebugMode().TraceLog ) ){
+        KunSceneManager.DebugLog( `File missing ${path}` );
+    }
+
+    return false;
+};*/
+/**
+ * @param {String} file 
+ * @returns String
+ */
+KunSceneManager.FilePath = function( file ){
+    var path = require('path');
+    var base = path.dirname(process.mainModule.filename);
+    return path.join(base, `audio/se/${file}`);
+};
+
+/**
+ * @returns Object
+ */
+KunSceneManager.Mode = function(){
+    return {
+        'Disabled': 'disabled',
+        'Touch': 'touch',
+        'Capture': 'capture',
+    };
+};
+KunSceneManager.Behavior = {
+    'Forward': 'forward',
+    'Reverse': 'reverse',
+    'PingPong': 'ping-pong',
+    'Static': 'static',
+};
+
+KunSceneManager.Capture = [];
+
+
+
+/**
+ * 
+ */
+function KunSceneImporter(){
+    throw `${this.constructor.name} is a Static Class`;
+};
+/**
+ * 
+ * @returns KunSceneImporter
+ */
+KunSceneImporter.summary = function(){
+    //leave this here for debugging.
+    if( KunSceneManager.debug(KunSceneManager.DebugMode().TraceLog) ){
+        KunSceneManager.DebugLog(`Imported a total of ${this._pictures} animated pictures, ${this._animations} animation layers and ${this._hotspots} hotspots`);
+        KunSceneManager.DebugLog(`Imported a total of ${this._actions} actions and  ${this._conditions} conditions`);
+    }
+    return this;    
+};
+/**
+ * @returns Object[]
+ */
+KunSceneImporter.listAnimationPacks = function(){
+    return $plugins.filter( plugin => plugin.name === 'KunAnimationPack' && plugin.status && plugin.parameters.scenes.length > 0 ).map(plugin => plugin.parameters);
+};
+/**
+ * @returns Object
+ */
+KunSceneImporter.PluginData = function ( ) {
+
+    function _parsePluginData ( key , value ) {
+        if (typeof value === 'string' && value.length ) {
+            try {
+                if (/^\{.*\}$|^\[.*\]$/.test(value)) {
+                    return JSON.parse(value, _parsePluginData );
+                }
+            } catch (e) {
+                // If parsing fails or it's not an object/array, return the original value
+            }
+            if( value === 'true' || value === 'false'){
+                return value === 'true';
+            }
+            if( !isNaN(value) ){
+                return parseInt(value);
+            }
+        }
+        else if( typeof value === 'object' && !Array.isArray(value) ){
+            var _output = {};
+            Object.keys( value ).forEach( function(key ){
+                _output[key] = _parsePluginData( key , value[key] );
+            });
+            return _output;
+        }
+        return value;
+    };
+
+    var pluginData = _parsePluginData( 'KunAnimations', PluginManager.parameters('KunAnimations'));
+
+    this.listAnimationPacks().map( pack => _parsePluginData('KunAnimationPack',pack) ).forEach( function( pack ){
+        //Import animation packs
+        if( pack.scenes.length ){
+            KunSceneManager.DebugLog(`Loading Animation Pack ${pack.name} (${pack.scenes.length} scenes)`);
+            pack.scenes.forEach( function(scene){
+                pluginData.controllers.push(_parsePluginData('KunAnimationPack',scene));
+            });    
+        }
+    });
+    return pluginData;
+};
+/**
+ * @param {Object[]} input 
+ * @returns KunSceneManager
+ */
+KunSceneImporter.import = function( input ){
+
+    this._scenes = 0;
+    this._pictures = 0;
+    this._animations = 0;
+    this._hotspots = 0;
+    this._actions = 0;
+    this._conditions = 0;
+
+    if(Array.isArray(input)){
+        input.forEach( function( controller ){
+            var pictures = Array.isArray(controller.source) ? controller.source : [];
+            var soundCollection = Array.isArray( controller.soundCollection ) ? controller.soundCollection : [];
+            var spotMap = {};
+            //import all scene defined hotspots
+            (Array.isArray(controller.hotspots) ? controller.hotspots : []).forEach( function(spot){
+                if( !spotMap.hasOwnProperty( spot.name ) ){
+                    spotMap[spot.name] = spot;
+                }
+            });            
+            //register a Scene Controller on every picture loaded in the list
+            for(var i = 0 ; i < pictures.length ; i++ ){
+                var soundPack = soundCollection.length >= pictures.length ? soundCollection[i] : (soundCollection.length ? soundCollection[0] : '');
+                var _scene = KunSceneImporter.importScene(
+                    pictures[i],
+                    controller ,
+                    soundPack ,
+                    spotMap );
+                KunSceneManager.addScene( _scene );
+            }
+        });
+    }
+
+    return this.summary();
+};
+
+/**
+ * 
+ * @param {String} picture
+ * @param {Object} controller
+ * @param {String} audioProfile
+ * @param {Object} hotSpots
+ */
+KunSceneImporter.importScene = function( picture , controller , audioProfile , hotSpots ){
+
+    var scene = new KunScene(picture,controller.cols,controller.rows, controller.fps || 0, audioProfile );
+
+    (Array.isArray(controller.framesets) ? controller.framesets : []).forEach( function( frameSet ){
+        scene.add( KunSceneImporter.importAnimation( frameSet , hotSpots ) );
+    });
+
+    if( Array.isArray(controller.actions)){
+        controller.actions.forEach( function( action ){
+            scene.addAction( KunSceneImporter.importAction(action));
+        });
+    }
+
+    this._scenes++;
+    this._pictures++;
+
+    return scene;
+};
+/**
+ * 
+ * @param {Object} frameSet 
+ * @param {Object} hotSpots 
+ * @returns KunAnimation
+ */
+KunSceneImporter.importAnimation = function( frameSet , hotSpots ){
+    var animation = new KunAnimation(
+        frameSet.name ,
+        frameSet.type ,
+        frameSet.fps,
+        frameSet.loops,
+        Array.isArray(frameSet.next) ? frameSet.next : [],
+        Array.isArray(frameSet.sounds) ? frameSet.sounds : [],
+        frameSet.offsetX,
+        frameSet.offsetY
+    );
+    //import frameset
+    (Array.isArray(frameSet.frames) ? frameSet.frames : []).forEach(function( frame ){
+        animation.add(frame);
+    });
+    //import conditions
+    (Array.isArray(frameSet.conditions) ? frameSet.conditions : []).forEach(function( condition ){
+        animation.addCondition( KunSceneImporter.importCondition(condition));
+    });
+
+    (Array.isArray(frameSet.spots) ? frameSet.spots : [] ).forEach( function( touchSpot ){
+        if( hotSpots.hasOwnProperty(touchSpot.name)){
+            var spot = hotSpots[touchSpot.name];
+            Object.keys(spot).forEach( function( key ){
+                if( !touchSpot.hasOwnProperty(key) ){
+                    touchSpot[key] = spot[key];
+                }
+            });
+            animation.registerSpot(KunSceneImporter.importSpot( touchSpot ) );
+        }
+    });
+
+    this._animations++;
+
+    return animation;
+};
+/**
+ * 
+ * @param {Object} action 
+ * @returns {KunAction}
+ */
+KunSceneImporter.importAction = function( action ){
+    var action = new KunAction(
+        action.var || 0,
+        action.op || '',
+        action.val,
+        action.on,
+        action.off,
+        action.se
+    );
+
+    /*if( Array.isArray( action.conditions) ){
+        action.conditions.forEach( function( condition ){
+            action.addCondition( KunSceneImporter.importCondition(condition) );
+        });
+    }*/
+    this._actions++;
+    return action;
+};
+/**
+ * 
+ * @param {Object} condition 
+ */
+KunSceneImporter.importCondition = function( condition ){
+
+    this._conditions++;
+
+    return new KunCondition(
+        condition.var || 0,
+        condition.op || '',
+        condition.val || 0,
+        condition.sw || 0,
+        condition.target || false
+    );
+};
+/**
+ * @param {Object} spot 
+ * @returns KunTouchEvent
+ */
+KunSceneImporter.importSpot = function( spot ){
+    var touchEvent = new KunTouchEvent(
+        spot.name,
+        spot.x1,
+        spot.y1,
+        spot.x2,
+        spot.y2,
+        spot.trigger || KunTouchEvent.Trigger.Queue,
+        Array.isArray(spot.next) ? spot.next : []
+    );
+
+    if( Array.isArray(spot.actions) ){
+        //map all event actions
+        spot.actions.forEach( function( action ){
+            touchEvent.addAction( KunSceneImporter.importAction(action) );
+        });
+    }
+    if( Array.isArray(spot.conditions) ){
+        //map all event conditions
+        spot.conditions.forEach( function( condition ){
+            touchEvent.addCondition( KunSceneImporter.importCondition(condition) );
+        });
+    }
+    this._hotspots++;
+    return touchEvent;
+};
+
+/**
+ * 
+ * @param {String} name 
+ * @param {Number} cols 
+ * @param {Number} rows 
+ * @param {Number} fps 
+ * @param {String} profile 
+ */
+function KunScene( name , cols , rows , fps , profile ){
+
+    this._name = name;
+    this._cols = cols || 1;
+    this._rows = rows || 1;
+    this._animationLayers = {
+        //setup frameset collection here
+    };
+    this._actions = [];
+    this._elapsed = 0;
+    this._loopCount = 0;
+    this._reverse = false;
+    this._playing = false;
+
+    this._index = 0;
+    this._current = '';
+
+    this._defaultFps = fps || KunSceneManager.defaultFps();
+    //this one can be overriden
+    this._fps = this._defaultFps;
+    this._touching = false;
+    this._profile = typeof profile === 'string' && profile.length ? profile : '';
+    //this._touch = [];
+    //use this to capture coordinates in Dev Mode
+    this._capture = [];
+};
+/**
+ * @returns Boolean
+ */
+KunScene.prototype.isValid = function(){
+    return this._name !== 'INVALID' && !this.empty();
+};
+/**
+ * @returns Boolean
+ */
+KunScene.prototype.isReady = function(){
+    return this._current.length > 0 && this.has(this._current);
+};
+/**
+ * @returns String
+ */
+KunScene.prototype.toString = function(){ return this.name(); };
+/**
+ * @returns String
+ */
+KunScene.prototype.name = function(){ return this._name; };
+
+/**
+ * @param KunAction action
+ * @returns KunScene
+ */
+KunScene.prototype.addAction = function( action ){
+    if( action instanceof KunAction ){
+        this._actions.push( action );
+    }
+    return this;
+};
+/**
+ * @param {Boolean} filter
+ * @returns {KunAction[]}
+ */
+KunScene.prototype.actions = function( filter ){
+    return typeof filter === 'boolean' && filter ?
+            this._actions.filter( action => action.canRun( ) ) :
+            this._actions;
+};
+/**
+ * @returns KunScene
+ */
+KunScene.prototype.runActions = function(){
+    this.actions(true).forEach( action => action.run() ) ;
+    return this;
+};
+
+/**
+ * @returns KunAnimation
+ */
+KunScene.prototype.current = function(){ return this.isReady() ? this.layers()[this._current] : null; };
+/**
+ * @returns Boolean
+ */
+KunScene.prototype.canTouch = function(){
+    var current = this.current();
+    return current !== null ? current.isInteractive() : false;
+};
+/**
+ * 
+ * @param {Number} x 
+ * @param {Number} y 
+ * @returns KunTouchEvent
+ */
+KunScene.prototype.getTouched = function( x , y ){
+
+    var current = this.current();
+    return current !== null ? current.touchSpot( x , y ) : null;
+};
+/**
+ * 
+ * @param {Number} x 
+ * @param {Number} y 
+ * @param {Number} sx
+ * @param {Number} sy
+ * @returns KunScene
+ */
+KunScene.prototype.touch = function( x  , y , sx , sy){
+    //console.log(`${x},${y} (${sx},${sy})`);
+    //console.log(this.current().name());
+    var spot = this.getTouched(x , y);
+    //console.log( spot );
+    if( spot !== null ){
+        switch( spot.trigger() ){
+            case KunTouchEvent.Trigger.Queue:
+                //KunSceneManager.enqueue( `${this.name()}.${spot.name()}` , x , y , sx , sy );
+                KunSceneManager.enqueue( this.name() , spot.name() , sx , sy );
+                break;
+            case KunTouchEvent.Trigger.Instant:
+                //perform spot update
+                spot.update();
+                //export X and Y positions
+                KunSceneManager.exportPosition( sx , sy );
+                //jump to next frameset (if any)
+                this.changeLayer( spot.next(), true );
+                break;
+            case KunTouchEvent.Trigger.Frame:
+                this.changeLayer(spot.next());
+                spot.setValue(this.current().first()).touchSfx();
+                break;
+        }
+        
+    }
+    return this;
+};
+/**
+ * @returns Array
+ */
+KunScene.prototype.capture = function(){
+    return this._capture;
+};
+/**
+ * @param {Number} x 
+ * @param {Number} y 
+ * @returns KunScene
+ */
+KunScene.prototype.captureFrom = function( x , y ){
+    this._capture = [x , y];
+    return this;
+};
+/**
+ * 
+ * @param {Number} x 
+ * @param {Number} y 
+ * @returns KunScene
+ */
+KunScene.prototype.captureTo = function( x , y ){
+    if( this._capture.length === 2 ){
+        this._capture.push(x);
+        this._capture.push(y);
+        //sort and arrrange
+        if( this._capture[0] > this._capture[2]){
+            var mx = this._capture[0];
+            this._capture[0] = this._capture[2];
+            this._capture[2] = mx;
+        }
+        if( this._capture[1] > this._capture[3]){
+            var my = this._capture[1];
+            this._capture[1] = this._capture[3];
+            this._capture[3] = my;
+        }
+        KunSceneManager.DebugLog( `Capture Coords: ${this._capture.join( ' ' )}` );
+    }
+    return this.clearCapture();
+};
+/**
+ * @returns KunScene
+ */
+KunScene.prototype.clearCapture = function(){
+    this._capture = [];
+    return this;
+};
+/**
+ * @returns Boolean
+ */
+KunScene.prototype.playing = function(){ return this._playing; }
+/**
+ * @returns KunScene
+ */
+KunScene.prototype.stop = function(){
+    this._playing = false;
+    return this;
+};
+/**
+ * @returns KunScene
+ */
+KunScene.prototype.resume = function(){
+    this._playing = true;
+    return this;
+};
+/**
+ * @returns Number
+ */
+KunScene.prototype.getFrame = function(){
+    return this.isReady() ? this.layers()[this._current].getFrame( this._index ) : 0;
+};
+/**
+ * @returns Number
+ */
+KunScene.prototype.index = function(){ return this._index; }
+/**
+ * @returns Number
+ */
+KunScene.prototype.cols = function(){ return this._cols; }
+/**
+ * @returns Number
+ */
+KunScene.prototype.rows = function(){ return this._rows; }
+/**
+ * @returns Number
+ */
+KunScene.prototype.totalFrames = function(){ return this._cols * this._rows; };
+/**
+ * @param {String} layer 
+ * @returns Boolean
+ */
+KunScene.prototype.has = function( layer ){
+    return typeof layer === 'string' && layer.length > 0 && this.layers().hasOwnProperty( layer );
+}
+/**
+ * @param {KunAnimation} layer 
+ * @returns {KunScene}
+ */
+KunScene.prototype.add = function( layer ){
+    if( layer instanceof KunAnimation ){
+        this.layers()[ layer.name() ] = layer;
+        if( this._current.length === 0 ){
+            this._current = layer.name();
+            //this.changeLayer( layer.name());
+        }
+    }
+    return this;
+};
+/**
+ * @param {Number} fps 
+ * @returns {KunScene}
+ */
+KunScene.prototype.setFps = function( fps ){
+    switch( true ){
+        case typeof fps === 'number' && fps > 0:
+            this._fps = fps;
+            break;
+        case this.has(this._current):
+            this._fps = this.current().fps() || this.defaultFps();
+            break;
+        default:
+            this._fps = this.defaultFps();
+            break;
+    }
+    return this;
+};
+/**
+ * @param {Boolean} list 
+ * @returns KunAnimation[] | Object
+ */
+KunScene.prototype.layers = function( list ){
+    return typeof list === 'boolean' && list ? Object.values( this._animationLayers ) : this._animationLayers;
+}
+/**
+ * @returns Boolean
+ */
+KunScene.prototype.empty = function(){
+    return this.layers(true).length === 0;
+};
+/**
+ * @returns {Number}
+ */
+KunScene.prototype.countFrames = function(){
+    return this.has(this._current) ? this.current().count() : 0;
+};
+/**
+ * @param {String} layer
+ * @returns KunScene
+ */
+KunScene.prototype.beforeChangeLayer = function( layer ){
+    if( this.has(layer) && this.layers()[layer].clearTargetQueue()){
+        //clear target queue on change from this scene to another
+        KunSceneManager.clearTargets();
+    }
+    return this;
+};
+/**
+ * @param {String} layer 
+ * @param {Boolean} play
+ * @returns KunScene
+ */
+KunScene.prototype.changeLayer = function( layer , play ){
+    if( this.has( layer ) ){
+        this.beforeChangeLayer( layer );
+        this._current = layer;
+        var layerFps = this.current().fps();
+        return this.reset( typeof play === 'boolean' && play ).setFps(layerFps).afterChangeLayer();
+    }
+    return this;
+}
+/**
+ * @returns KunScene
+ */
+KunScene.prototype.afterChangeLayer = function( ){
+    var current = this.current();
+    if( current !== null ){
+        //run all enqueued actions
+        current.runActions();
+    }
+    return this;
+};
+/**
+ * @param {String[]} layers
+ * @param {Boolean} filterLocked
+ * @returns {String}
+ */
+KunScene.prototype.selectLayer = function( layers , filterLocked ){
+    if( typeof filterLocked === 'boolean' && filterLocked ){
+        //console.log('unfiltered', layers);
+        layers = this.layers(true)
+            .filter( fs => layers.includes(fs.name()) && fs.unlocked())
+            .map( fs => fs.name());
+        //console.log( 'filtered', layers) ;
+    }
+    switch( true ){
+        case layers.length > 1:
+            return layers[ Math.floor( Math.random() * layers.length ) ];
+        case layers.length > 0:
+            return layers[0];
+        default:
+            return '';
+    }
+}
+/**
+ * @param {Boolean} replay
+ * @returns {KunScene}
+ */
+KunScene.prototype.next = function( replay ){
+    var next = this.isReady() ? this.selectLayer( this.current().next() , true ) : '';
+    if( next.length > 0 ){
+        return this.changeLayer( next , true );
+    }
+    if( typeof replay === 'boolean' && replay ){
+        return this.reset(true);
+    }
+    else{
+        this._playing = false;
+    }
+    return this;
+};
+/**
+ * @returns {KunScene}
+ */
+KunScene.prototype.first = function(){
+    if(!this.empty()){
+        return this.changeLayer(this.layers(true)[0].name(), true );
+    }
+    return this;
+};
+/**
+ * @param {Boolean} play
+ * @returns {KunScene}
+ */
+KunScene.prototype.reset = function( play ){
+    this._loopCount = this.current().loops();
+    switch(this.current().behavior()){
+        case KunSceneManager.Behavior.Reverse:
+            this._reverse = true;
+            this._index = this.countFrames() - 1;
+            break;
+        case KunSceneManager.Behavior.Forward:
+            this._reverse = false;
+            break;
+        case KunSceneManager.Behavior.PingPong:
+            this._reverse = false;
+            break;
+        case KunSceneManager.Behavior.Static:
+            break;
+    }
+    this._playing = (typeof play === 'boolean' && play ) || this._playing;
+    return this.playSound( this._profile );
+}
+/**
+ * @param {Number} round
+ * @returns {KunScene}
+ */
+KunScene.prototype.playSound = function( round ){
+    if( this.playing() ){
+        this.current().playSound( this._profile , round );
+    }
+    return this;
+};
+/**
+ * @returns Number
+ */
+KunScene.prototype.defaultFps = function(){
+    return this._defaultFps;
+};
+/**
+ * @returns Number
+ */
+KunScene.prototype.FPS = function(){
+    return this._fps;
+};
+/**
+ * @returns Boolean
+ */
+KunScene.prototype.tick = function(){
+    this._elapsed = ++this._elapsed % this.FPS();
+    return this._elapsed === 0;
+};
+/**
+ * @returns {KunScene}
+ */
+KunScene.prototype.update = function(){
+    if( this.playing() ){
+        if( this.tick() ){
+            switch( this.current().behavior() ){
+                case KunSceneManager.Behavior.PingPong:
+                    this.updatePingPong();
+                    break;
+                case KunSceneManager.Behavior.Reverse:
+                    this.updateReverse();
+                    break;
+                case KunSceneManager.Behavior.Static:
+                    //do not change
+                    break;
+                case KunSceneManager.Behavior.Forward:
+                default:
+                    this.updateForward();
+                    break;
+            }
+            //this.changeLayer(KunSceneManager.getOverride(this._name));
+    
+            return true;
+        }    
+    }
+    return false;
+};
+/**
+ * @returns KunScene
+ */
+KunScene.prototype.updatePingPong = function(){
+    if( !this._reverse ){
+        //ping
+        if( this._index < this.countFrames() - 1){
+            this._index++;
+        }
+        if( this._index === this.countFrames() - 1 ){
+            this._reverse = true;
+        }
+    }
+    else if(this._index > 0){
+        //pong
+        this._index--;
+        //after complete the round
+        if( this._index === 0 ){
+            if( this._loopCount > 0 ){
+                this._loopCount--;
+                if( this._loopCount === 0 ){
+                    //change state
+                    return this.next(true);
+                }
+                this.playSound(this._loopCount);
+            }
+            this._reverse = false;
+        }
+    }
+
+    return this;
+}
+/**
+ * @returns KunScene
+ */
+KunScene.prototype.updateReverse = function(){
+    if( this._index > 0 ){
+        this._index--;
+    }
+    else{
+        if( this._loopCount > 0 ){
+            this._loopCount--;
+            if( this._loopCount === 0 ){
+                //change state
+                return this.next(true);
+            }
+            this.playSound(this._loopCount);
+        }
+        //reset counter
+        this._index = this.countFrames() - 1;
+    }
+    return this;
+}
+/**
+ * @returns KunScene
+ */
+KunScene.prototype.updateForward = function(){
+    this._index = ++this._index % this.countFrames();
+    //check this conditiojn first, then update index, also run when index points to last frame.
+    //console.log(`${this._index} / ${this.countFrames()} : ${this._loopCount}`);
+    if( this._index === 0 ){
+        if( this._loopCount > 0 ){
+            this._loopCount--;
+            if( this._loopCount === 0 ){
+                //change state
+                return this.next(true);
+            }
+            this.playSound(this._loopCount);
+        }
+        //this._index = 0;
+    }
+    return this;
+}
+/**
+ * @returns KunScene
+ */
+KunScene.prototype.updateForward_NEW = function(){
+    //check this conditiojn first, then update index, also run when index points to last frame.
+    if( this._index === this.countFrames() - 1 ){
+        if( this._loopCount > 0 ){
+            this._loopCount--;
+            if( this._loopCount === 0 ){
+                //change state
+                return this.next(true);
+            }
+            this.playSound(this._loopCount);
+        }
+        //this._index = 0;
+    }
+    this._index = ( this._index + 1 ) % this.countFrames();
+    return this;
+}
+
+/**
+ * @returns KunScene
+ */
+KunScene.prototype.instance = function(){
+    var copy = new KunScene( this._name, this._cols,this._rows , this.FPS() , this._profile );
+    copy._frameSets = this.layers();
+    copy._current = this._current;
+    return copy.reset();
+};
+/**
+ * @returns KunScene|Object
+ */
+KunScene.prototype.dump = function(){
+    return this;
+};
+
+/**
+ * @returns 
+ */
+KunScene.INVALID = new KunScene('INVALID');
+
+
+//function KunAnimation(){ this.initialize.apply( this , arguments ); };
+//KunAnimation.prototype = Object.create(Sprite.prototype);
+/**
+ * 
+ * @param {String} name 
+ * @param {String} type 
+ * @param {Number} fps 
+ * @param {Number} loops 
+ * @param {String} next 
+ * @param {String} bank
+ * @param {Number} offsetX
+ * @param {Number} offsetY
+ */
+function KunAnimation( name , type , fps, loops , next , bank , offsetX , offsetY , clearTargets ){
+    this._name = name.toLowerCase().replace(/[\s\_]/,'-');
+    this._fps = typeof fps === 'number' && fps > 0 ? fps : 0;
+    this._frames = [];
+    this._type = type || KunSceneManager.Behavior.Default;
+    this._loops = loops || 0;
+    this._offsetX = offsetX || 0;
+    this._offsetY = offsetY || 0;
+    this._clearTargets = typeof clearTargets === 'boolean' && clearTargets;
+    this._spots = {
+        //interactive spots to touch
+    };
+    this._next = Array.isArray( next ) ? next  : ( typeof next === 'string' && next.length ? [next] : [] );
+    this._soundpack = Array.isArray(bank) ? bank : ( typeof bank === 'string' && bank.length ? [bank] : []) ;
+
+    this._actions = [
+        //add here all actions to run when this frameset plays
+    ];
+    this._conditions = [
+        //add here all conditions to run when this frameset plays
+    ];
+};
+/**
+ * @param KunAction action
+ * @returns KunAnimation
+ */
+KunAnimation.prototype.addAction = function( action ){
+    if( action instanceof KunAction ){
+        this._actions.push( action );
+    }
+    return this;
+};
+/**
+ * @param {Boolean} filter
+ * @returns {KunAction[]}
+ */
+KunAnimation.prototype.actions = function( filter ){
+    return typeof filter === 'boolean' && filter ?
+            this._actions.filter( action => action.canRun( ) ) :
+            this._actions;
+};
+/**
+ * @returns KunAnimation
+ */
+KunAnimation.prototype.runActions = function(){
+    this.actions(true).forEach( action => action.run() );
+    return this;
+};
+/**
+ * @param KunCondition condition
+ * @returns KunAnimation
+ */
+KunAnimation.prototype.addCondition = function( condition ){
+    if( condition instanceof KunCondition ){
+        this._conditions.push( condition );
+    }
+    return this;
+};
+/**
+ * @param {Boolean} filter
+ * @returns KunCondition[]
+ */
+KunAnimation.prototype.conditions = function( filter ){
+    return typeof filter === 'boolean' && filter ?
+        this._conditions.filter( condition => condition.validate() ) :
+        this._conditions;
+};
+/**
+ * @returns Boolean
+ */
+KunAnimation.prototype.unlocked = function(){
+    return this.conditions(true).length === this.conditions().length;
+};
+/**
+ * 
+ * @returns 
+ */
+KunAnimation.prototype.randomSpot = function(){
+    var list = this.spots(true);
+    return list[Math.floor( Math.random() * list.length)];
+};
+/**
+ * @returns Boolean
+ */
+KunAnimation.prototype.clearTargetQueue = function( ){
+    return this._clearTargets;
+};
+/**
+ * @returns Number
+ */
+KunAnimation.prototype.offsetX = function( ){
+    return this._offsetX;
+    if( typeof scale !== 'number'){
+        scale = 1;
+    }
+    return parseInt( this._offsetX * scale );
+};
+/**
+ * @returns Number
+ */
+KunAnimation.prototype.offsetY = function( ){
+    return this._offsetY;
+    if( typeof scale !== 'number'){
+        scale = 1;
+    }
+    return parseInt( this._offsetY * scale );
+};
+/**
+ * @returns Boolean
+ */
+KunAnimation.prototype.isInteractive = function(){
+    return this.spots(true).length > 0;
+};
+/**
+ * 
+ * @param {KunTouchEvent} spot 
+ * @returns KunAnimation
+ */
+KunAnimation.prototype.registerSpot = function( spot ){
+
+    if( spot instanceof KunTouchEvent && !this._spots.hasOwnProperty(spot.name()) ){
+        //
+        this._spots[spot.name()] = spot;
+    }
+
+    return this;
+};
+/**
+ * List all spots as array or object ids
+ * @param {Boolean} list 
+ * @returns Object | KunTouchEvent[]
+ */
+KunAnimation.prototype.spots = function( list ){
+    return typeof list === 'boolean' && list ? Object.values( this._spots ) : this._spots;
+}
+/**
+ * @param {String} spot 
+ * @returns Boolean
+ */
+KunAnimation.prototype.hasSpot = function( spot ){
+    return this._spots.hasOwnProperty(spot);
+}
+/**
+ * @param {String} spot 
+ * @returns KunTouchEvent
+ */
+KunAnimation.prototype.getSpot = function( spot ){
+    return this.hasSpot(spot) ? this._spots[spot] : null;
+}
+/**
+ * Check if any spot was touched
+ * @param {Number} x 
+ * @param {Number} y 
+ * @returns KunTouchEvent 
+ */
+KunAnimation.prototype.touchSpot = function( x , y ){
+    var hotspots = this.spots(true);
+    for( var i in hotspots ){
+        //hotspots[i].test( x , y );
+        if( hotspots[i].touched( x , y ) ){
+            //console.log( `${hotspots[i]} touched on ${x},${y}` );
+            return hotspots[i];
+        }
+    }
+    return null;
+};
+/**
+ * @returns String
+ */
+KunAnimation.prototype.behavior = function(){
+    return this._type;
+};
+/**
+ * @param {Number} frame 
+ * @returns KunAnimation
+ */
+KunAnimation.prototype.add = function( frame ){
+    this._frames.push( frame );
+    return this;
+};
+/**
+ * @returns Number
+ */
+KunAnimation.prototype.fps = function(){
+    return this._fps;
+    //return this._fps > 0 ? this._fps : KunSceneManager.defaultFps();
+};
+/**
+ * @returns Number
+ */
+KunAnimation.prototype.loops = function(){
+    return this._loops;
+};
+/**
+ * @returns Number
+ */
+KunAnimation.prototype.frames = function( ){
+    return this._frames.length > 0 ? this._frames : [0];
+}
+/**
+ * @returns Number
+ */
+KunAnimation.prototype.first = function(){
+    return this.frames().length > 0 ? this.frames()[0] : 0;
+};
+/**
+ * @param {Number} index 
+ * @returns Number
+ */
+KunAnimation.prototype.getFrame = function( index ){
+    return this._frames.length > index ? this._frames[index] : this._frames[0];
+    return this._frames.length > index ? this._frames[index] : 0;
+};
+/**
+ * @returns Number
+ */
+KunAnimation.prototype.count = function(){
+    return this.frames().length;
+};
+/**
+ * @returns Number
+ */
+KunAnimation.prototype.name = function(){
+    return this._name;
+};
+/**
+ * @returns String[]
+ */
+KunAnimation.prototype.next = function(){
+    return this.nextLayers();
+};
+/**
+ * @returns String[]
+ */
+KunAnimation.prototype.nextLayers = function(){
+    return this._next;
+};
+/**
+ * @returns Boolean
+ */
+KunAnimation.prototype.hasSoundPack = function(){
+    return this._soundpack.length > 0;
+};
+/**
+ * @param {String} profile
+ * @returns String
+ */
+KunAnimation.prototype.getSoundPack = function( profile ){
+    if( this.hasSoundPack() ){
+        var selection = this._soundpack.length > 1 ? Math.floor(Math.random() * this._soundpack.length) : 0;
+        return typeof profile === 'string' && profile.length ? profile + '-' + this._soundpack[selection] : this._soundpack[selection];
+    }
+    return '';
+};
+/**
+ * @param {String} profile
+ * @param {Number} round
+ * @returns KunAnimation
+ */
+KunAnimation.prototype.playSound = function( profile , round ){
+    var soundPack = this.getSoundPack( profile );
+    KunSceneManager.playSound( soundPack , round );
+    return this;
+};
+
+/**
+ * 
+ * @param {String} name 
+ * @param {Number} x1 
+ * @param {Number} y1 
+ * @param {Number} x2 
+ * @param {Number} y2 
+ * @param {Number} varId
+ * @param {String} behavior
+ * @param {String} sfx
+ * @param {String} next
+ */
+function KunTouchEvent( name , x1 , y1 , x2 , y2 , trigger, next  ){
+
+    this._name = name;
+    this._x1 = parseInt( x1 );
+    this._y1 = parseInt(y1);
+    this._x2 = parseInt(x2);
+    this._y2 = parseInt(y2);
+    
+    //this._varId = parseInt(varId || 0 );
+    //this._amount = typeof amount === 'number' && amount > 0 ? amount : 1;
+    //this._behavior = typeof behavior === 'string' && behavior.length ? behavior : KunTouchEvent.Behaviour.Add;
+    //this._sfx = sfx || '';
+    
+    this._trigger = typeof trigger === 'string' && trigger.length ? trigger : KunTouchEvent.Trigger.Queue;
+    this._next = Array.isArray(next) ? next : [];
+
+    this._actions = [];
+    this._conditions = [];
+
+    //this._hotspot = null;
+}
+/**
+ * @returns String
+ */
+KunTouchEvent.prototype.toString = function(){
+    return `${this.name()} (${this._x1} ${this._y1} ${this._x2} ${this._y2})`;
+}
+/**
+ * @returns String
+ */
+KunTouchEvent.prototype.name = function(){
+    return this._name;
+};
+/**
+ * @returns Object {x,y} coordinates of the selected spot
+ */
+KunTouchEvent.prototype.generatePosition = function(){
+    var x = Math.floor(Math.random() * (this._x2 - this._x1)) + this._x1;
+    var y = Math.floor(Math.random() * (this._y2 - this._y1)) + this._y1;
+    return {
+        'x':x,
+        'y':y,
+    };
+};
+/**
+ * @returns String[]
+ */
+KunTouchEvent.prototype.nextLayers = function(){
+    return this._next;
+};
+/**
+ * @returns String
+ */
+KunTouchEvent.prototype.next = function(){
+    var jumpTo = this._next.length > 1 ? Math.floor( Math.random() * this._next.length) : 0;
+    return this._next.length > 0 ? this._next[ jumpTo ] : '';
+};
+/**
+ * @returns Number
+ */
+/*KunTouchEvent.prototype.amount = function(){
+    return this._amount;
+};*/
+/**
+ * @returns String
+ */
+/*KunTouchEvent.prototype.behavior = function(){
+    return this._behavior;
+};*/
+/**
+ * @returns String
+ */
+KunTouchEvent.prototype.trigger = function(){
+    return this._trigger;
+};
+/**
+ * @returns KunTouchEvent
+ */
+/*KunTouchEvent.prototype.touchSfx = function(){
+    if( this._sfx.length ){
+        KunSceneManager.PlayFX( this._sfx );
+    }
+    return this;
+}*/
+/*KunTouchEvent.prototype.setValue = function( value ){
+    if( this._varId > 0 ){
+        $gameVariables.setValue( this._varId , value );
+    }
+    return this;
+};*/
+/**
+ * @returns {KunTouchEvent}
+ */
+KunTouchEvent.prototype.update = function(){
+
+    return this.runActions();
+    if( this._varId > 0 ){
+        switch( this.behavior()){
+            case KunTouchEvent.Behaviour.Add:
+            case KunTouchEvent.Behaviour.Increase: //deprecated
+                this.setValue( $gameVariables.value(this._varId) + this.amount() );
+                break;
+            case KunTouchEvent.Behaviour.Substract:
+                var amount = $gameVariables.value(this._varId) - this._amount();
+                this.setValue( amount > 0 ? amount : 0 );
+                break;
+            case KunTouchEvent.Behaviour.Set:
+                this.setValue( this.amount() );
+                break;
+            //case KunTouchEvent.Behaviour.Frame:
+                //this.setValue( $gameVariables.value(this._varId) + 1 );
+            //    break;
+        }
+    }
+    return this;
+}
+/**
+ * 
+ * @param {Number} x 
+ * @param {Number} y 
+ * @returns 
+ */
+KunTouchEvent.prototype.touched = function( x , y ){
+    return (this._x1 <= x && this._x2 >= x) && (this._y1 <= y && this._y2 >= y);
+};
+/**
+ * 
+ * @param {Number} x 
+ * @param {Number} y 
+ * @returns {KunTouchEvent}
+ */
+KunTouchEvent.prototype.test = function( x , y){
+    console.log( `${this.name()} X(${this._x1} >= ${x} <= ${this._x2}) Y(${this._y1} >= ${y} <= ${this._y2})` );
+    return this;
+};
+
+/**
+ * @param {KunAction} action
+ * @returns {KunTouchEvent}
+ */
+KunTouchEvent.prototype.addAction = function( action ){
+    if( action instanceof KunAction ){
+        this._actions.push( action );
+    }
+    return this;
+};
+/**
+ * @param {Boolean} filter
+ * @returns {KunAction[]}
+ */
+KunTouchEvent.prototype.actions = function( filter ){
+    return typeof filter === 'boolean' && filter ?
+        this._actions.filter( action => action.canRun( ) ) :
+        this._actions;
+};
+/**
+ * @returns {KunTouchEvent}
+ */
+KunTouchEvent.prototype.runActions = function(){
+    this.actions(true).forEach( action => action.run() );
+    return this;
+};
+/**
+ * @param {KunCondition} condition
+ * @returns {KunTouchEvent}
+ */
+KunTouchEvent.prototype.addCondition = function( condition ){
+    if( condition instanceof KunCondition ){
+        this._conditions.push( condition );
+    }
+    return this;
+};
+/**
+ * @param {Boolean} filter
+ * @returns {KunCondition[]}
+ */
+KunTouchEvent.prototype.conditions = function( filter ){
+    return typeof filter === 'boolean' && filter ?
+        this._conditions.filter( condition => condition.validate() ) :
+        this._conditions;
+};
+/**
+ * @returns {Boolean}
+ */
+KunTouchEvent.prototype.unlocked = function(){
+    return this.conditions(true).length === this.conditions().length;
+};
+
+/**
+ * 
+ */
+KunTouchEvent.Trigger = {
+    'Instant': 'instant',
+    'Queue': 'queue',
+    'Ignore': 'ignore',
+    'Frame': 'frame',
+};
+/**
+ * 
+ */
+KunTouchEvent.Behaviour = {
+    'Increase': 'increase',
+    'Add': 'add',
+    'Substract': 'sub',
+    'Set': 'set',
+    'Frame': 'frame', //DEPRECATED
+};
+/**
+ * Handle conditions to unlock available layers
+ * @param {Number} gameVar 
+ * @param {String} operation 
+ * @param {Number} value 
+ * @param {Number} gameSwitch
+ * @param {Boolean} targetVar
+ */
+function KunCondition( gameVar , operation , value , gameSwitch , targetVar ){
+    this._gameSwitch = typeof gameSwitch === 'number' && gameSwitch > 0 ? gameSwitch : 0;
+    this._gameVar = typeof gameVar === 'number' && gameVar > 0 ? gameVar : 0;
+    this._operator = typeof operation === 'string' && operation.length > 0 ? operation : KunCondition.Operators().Equal;
+    this._value = typeof value === 'number' && value > 0 ? value : 0;
+    this._targetVar = typeof targetVar === 'boolean' && targetVar;
+};
+/**
+ * @returns Boolean
+ */
+KunCondition.prototype.targetVar = function( ){
+    return this._targetVar && this._value > 0;
+};
+/**
+ * @returns Number
+ */
+KunCondition.prototype.value = function( ){
+    return this.targetVar() ? $gameVariables.value(this._value) : this._value;
+};
+/**
+ * @param {Boolean} importGameVar 
+ * @returns Number
+ */
+KunCondition.prototype.gameVar = function( importGameVar ){
+    return typeof importGameVar === 'boolean' && importGameVar ? $gameVariables.value(this.gameVar()) : this._gameVar;
+};
+KunCondition.prototype.gameSwitch = function( importGameSwitch ){
+    return typeof importGameSwitch === 'boolean' && importGameSwitch ? $gameSwitches.value(this.gameSwitch()) : this._gameSwitch;
+};
+/**
+ * @returns String
+ */
+KunCondition.prototype.operator = function( ){
+    return this._operator;
+};
+/**
+ * @returns Boolean
+ */
+KunCondition.prototype.validate = function( ){
+    if( this.gameVar() > 0 ){
+        //validate variable
+        switch( this.operator()){
+            case KunCondition.Operators.Greater:
+                return this.gameVar(true) > this.value();
+            case KunCondition.Operators.GreaterOrEqual:
+                return this.gameVar(true) >= this.value();
+            case KunCondition.Operators.Equal:
+                return this.gameVar(true) = this.value();
+            case KunCondition.Operators.LowerOrEqual:
+                return this.gameVar(true) <= this.value();
+            case KunCondition.Operators.Lower:
+                return this.gameVar(true) < this.value();
+        };    
+    }
+    if( this.gameSwitch() > 0 ){
+        //validate switch
+        return this.gameSwitch(true);
+    }
+    return true;
+};
+/**
+ * 
+ */
+KunCondition.Operators = {
+    'Greater': 'greater',
+    'GreaterOrEqual': 'greater_equal',
+    'Equal': 'equal',
+    'LowerOrEqual': 'lower_equal',
+    'Lower': 'lower',
+};
+
+/**
+ * Define a set of actions for each layer upon playing
+ * @param {Number} gameVar 
+ * @param {String} operation 
+ * @param {Number} value 
+ * @param {Number[]} gameSwitchesOn 
+ * @param {Number[]} gameSwitchesOff 
+ * @param {String} se
+ */
+function KunAction( gameVar , operation , value , gameSwitchesOn, gameSwitchesOff , se ){
+
+    this._gameVar = typeof gameVar === 'number' && gameVar > 0 ? gameVar : 0;
+    this._operation = typeof operation === 'string' && operation.length ? operation : KunAction.Operators.Add;
+    this._value = Array.isArray(value) ? value.sort( ( a,b) => a-b ) : ( typeof value === 'number' && value > 0 ? [value] : [0] );
+    this._switchOn = Array.isArray( gameSwitchesOn ) ? gameSwitchesOn.map( sw => parseInt( sw ) ) : [];
+    this._switchOff = Array.isArray( gameSwitchesOff ) ? gameSwitchesOff.map( sw => parseInt( sw ) ) : [];
+    this._se = typeof se === 'string' && se.length ? se : '';
+
+    //this._conditions = [];
+};
+/**
+ * @returns String
+ */
+KunAction.prototype.operation = function( ){
+    return this._operation;
+}
+/**
+ * @returns Boolean
+ */
+KunAction.prototype.canRun = function( ){
+    return true;
+    //return this.unlocked();
+}
+/**
+ * @returns {KunAction}
+ */
+KunAction.prototype.playSe = function(){
+
+    if( this._se.length ){
+        KunSceneManager.PlayFX( this._se );
+    }
+    return this;
+}
+/**
+ * @returns {KunAction}
+ */
+KunAction.prototype.run = function( ){
+    return this.updateGameVar().switchOff().switchOn().playSe();
+}
+/**
+ * @param {Boolean} importValue import the Current Value of this game variable
+ * @returns Number
+ */
+KunAction.prototype.gameVar = function( importValue ){
+    return typeof importValue === 'boolean' && importValue ? $gameVariables.value(this._gameVar) : this._gameVar;
+}
+/**
+ * @returns Number
+ */
+KunAction.prototype.value = function( ){
+    switch( true ){
+        case this._value.length > 2:
+            var selection = Math.floor( Math.random() * this._value.length);
+            return this._value[selection];
+        case this._value.length > 1:
+            return Math.floor( Math.random() * (this._value[1]-this._value[0])) + this._value[0];
+        case this._value.length > 0:
+            return this._value[0];
+    }
+    return 0;
+}
+/**
+ * @returns KunLayerActions
+ */
+KunAction.prototype.updateGameVar = function(){
+    var value = this.value();
+    if( value > 0 ){
+        switch( this.operation() ){
+            case KunAction.Operators.Add:
+                $gameVariables.setValue( this.gameVar() , this.gameVar( true ) + value);
+                break;
+            case KunAction.Operators.Sub:
+                var current = this.gameVar( true );
+                $gameVariables.setValue( this.gameVar() , current - value > 0 ? current - value : 0);
+                break;
+            case KunAction.Operators.Set:
+                $gameVariables.setValue( this.gameVar() , value);
+                break;
+        }
+    }
+    return this;
+};
+/**
+ * @returns KunLayerActions
+ */
+KunAction.prototype.switchOn = function(){
+    this._switchOn.forEach( function( gameSwitch ){
+        $gameSwitches.setValue(gameSwitch,true);
+    });
+    return this;
+};
+/**
+ * @returns KunLayerActions
+ */
+KunAction.prototype.switchOff = function(){
+    this._switchOff.forEach( function( gameSwitch ){
+        $gameSwitches.setValue(gameSwitch,false);
+    });
+    return this;
+};
+/**
+ * @param KunCondition condition
+ * @returns {KunAction}
+ */
+/*KunAction.prototype.addCondition = function( condition ){
+    if( condition instanceof KunCondition ){
+        this._conditions.push( condition );
+    }
+    return this;
+};*/
+/**
+ * @param {Boolean} filter
+ * @returns KunCondition[]
+ */
+/*KunAction.prototype.conditions = function( filter ){
+    return typeof filter === 'boolean' && filter ?
+        this._conditions.filter( condition => condition.validate() ) :
+        this._conditions;
+};*/
+/**
+ * @returns Boolean
+ */
+/*KunAction.prototype.unlocked = function(){
+    return this.conditions(true).length === this.conditions().length;
+};*/
+/**
+ * 
+ */
+KunAction.Operators = {
+    'Add': 'add',
+    'Sub': 'sub',
+    'Set': 'set',
+};
+
+
+
+/**
+ * 
+ */
+function KunAnimations_RegisterManagers(){
+
+    var _kunAnimations_Initialize_Sprite = Sprite_Picture.prototype.initialize;
+    Sprite_Picture.prototype.initialize = function( pictureId ){
+        _kunAnimations_Initialize_Sprite.call(this,pictureId);
+        this._touching = false;
+    };
+
+    var _kunAnimations_Load_Bitmap = Sprite_Picture.prototype.loadBitmap;
+    Sprite_Picture.prototype.loadBitmap = function() {
+        //vanilla image preload
+        _kunAnimations_Load_Bitmap.call(this);
+        //setup animation if its a scene spritesheet
+        if( this.isAnimated() ){
+            this.animationScene().reset(true); //initialize and play
+            this.bitmap.addLoadListener(this.initializeAnimation.bind(this));
+        }
+    };
+
+    var _kunAnimations_Update_Sprite = Sprite_Picture.prototype.update;
+    Sprite_Picture.prototype.update = function(){
+        //call vanilla
+        _kunAnimations_Update_Sprite.call( this );
+
+        if( this.isAnimated()){
+            //update the scene manager
+            this.updateAnimation( this.animationScene( ) ).processTouch();
+        }
+    };
+    /**
+     * @returns Sprite_Picture
+     */
+    Sprite_Picture.prototype.initializeAnimation = function( ){
+        return this.updateAnimation( this.animationScene( ) , true );
+    };
+    /**
+     * @param {KunScene} sceneController
+     * @param {Boolean} forceUpdate
+     * @returns Sprite_Picture
+     */
+    Sprite_Picture.prototype.updateAnimation = function( sceneController , forceUpdate ){
+        if( sceneController.isValid() ){
+            if( sceneController.update() || forceUpdate ){
+                var index = sceneController.getFrame();
+                var w = this.bitmap.width / sceneController.cols();
+                var h = this.bitmap.height / sceneController.rows();
+                var x = index % sceneController.cols() * w;
+                var y = Math.floor(index / sceneController.cols()) * h;
+                this.setFrame( x, y, w, h);
+                //return true;                    
+            }
+        }
+        return this;
+    };
+    /**
+     * @returns KunScene
+     */
+    Sprite_Picture.prototype.animationScene = function(){
+        return KunSceneManager.scene(this._pictureName);
+    };
+    /**
+     * @returns Boolean
+     */
+    Sprite_Picture.prototype.isAnimated = function(){
+        return KunSceneManager.has(this._pictureName);
+    }
+    /**
+     * @returns Boolean
+     */
+    Sprite_Picture.prototype.isLoaded = function(){
+        return typeof this.bitmap !== 'undefined' && this.bitmap !== null;
+    };
+
+    Sprite_Picture.prototype.isInteractive = function(){
+        //capture from plugin animation data
+        return this.animationScene().isInteractive();
+    };
+    /**
+     * @param {Number} x 
+     * @returns Number
+     */
+    Sprite_Picture.prototype.offsetX = function( x ){
+        return this.picture().scaleX() > 0 ? Math.floor((x - this.picture().x()) * 100 / this.picture().scaleX()) : 0;
+    };
+    /**
+     * @param {Number} y 
+     * @returns Number
+     */
+    Sprite_Picture.prototype.offsetY = function( y ){
+        return this.picture().scaleY() > 0 ? Math.floor((y - this.picture().y()) * 100 / this.picture().scaleY()) : 0;
+    };
+    /**
+     * @returns Boolean
+     */
+    Sprite_Picture.prototype.validScale = function(  ){
+        return this.picture().scaleX() > 0 && this.picture().scaleY() > 0
+    }
+    /**
+     * @returns Boolean
+     */
+    Sprite_Picture.prototype.processTouch = function() {
+        if( this.isAnimated() ){
+            if (TouchInput.isTriggered()) {
+                if( !this._touching ){
+                    this._touching = true;
+                }
+                if(KunSceneManager.canCapture()){
+                    this.animationScene().captureFrom( this.offsetX(TouchInput._x), this.offsetY(TouchInput._y));
+                }
+            }
+            if (TouchInput.isReleased()) {
+                if (this._touching) {
+                    this._touching = false;
+                    //console.log( `Touch ${TouchInput._x},${TouchInput._y} (${this.validScale()})` );
+                    //var picture = this.picture();
+                    if(KunSceneManager.canCapture()){
+                        this.animationScene().captureTo(this.offsetX(TouchInput._x), this.offsetY(TouchInput._y));    
+                    }
+                    else if( KunSceneManager.canTouch() && this.validScale( ) ){
+                        var X = TouchInput._x;
+                        var Y = TouchInput._y;
+                        this.animationScene().touch(this.offsetX(X), this.offsetY(Y), X, Y);
+                    }
+                }
+            }
+        }
+        return this._touching;
+    };
+
+    //OVERRIDE Game_Picture move method to capture the picture offset when required
+    var _kunAnimations_Game_Picture_Move = Game_Picture.prototype.move;
+    Game_Picture.prototype.move = function(origin, x, y, scaleX, scaleY, opacity, blendMode, duration) {
+
+        //capture X and Y offset from picture name
+        if( this._name.length ){
+            //import offset from currently active picture's frameset controller plus the scale
+            var _offset = KunSceneManager.offset(this._name);
+            //then apply the transformations
+            x -= parseInt( _offset.x * (scaleX / 100) );
+            y -= parseInt( _offset.y * (scaleY / 100) );
+        }
+
+        _kunAnimations_Game_Picture_Move.call(this,origin,x,y,scaleX,scaleY,opacity,blendMode,duration);
+    };
+}
+/**
+ * 
+ */
+function KunAnimations_SetupCommands(){
+    var _KunAnimations_SetupCommands = Game_Interpreter.prototype.pluginCommand;
+    Game_Interpreter.prototype.pluginCommand = function(command, args) {
+        _KunAnimations_SetupCommands.call(this, command, args);
+        if (command === 'KunAnimations' && args.length > 0 ) {
+            switch( args[0] ){
+                case 'alias':
+                    if( args.length > 2 ){
+                        KunSceneManager.setAlias( args[1] , args[2] );
+                    }
+                    break;
+                case 'clear':
+                    if( args.length > 1 ){
+                        switch( args[1]){
+                            case 'targets':
+                                KunSceneManager.clearTargets();
+                                break;
+                            case 'alias':
+                                KunSceneManager.clearAlias();
+                                break;
+                            case 'all':
+                                KunSceneManager.clearAlias().clearTargets();
+                                break;
+                        }
+                    }
+                    else{
+                        KunSceneManager.clearTargets();
+                    }
+                    break;
+                case 'fps':
+                    if( args.length > 2 ){
+                        var fps = parseInt( args[2] );
+                        if( args.length > 3 && args[3] === 'import' ){
+                            fps = $gameVariables.value( fps );
+                        }
+                        KunSceneManager.overrideFPS( KunSceneManager.getAlias(args[1]) ,  fps );
+                        //KunSceneManager.DebugLog(`FPS updated to ${fps}`);
+                    }
+                    break;
+                case 'reset':
+                    if( args.length > 1 ){
+                        KunSceneManager.reset( KunSceneManager.getAlias(args[1]) , args.length > 2 && args[2] === 'replay' );
+                    }
+                    break;
+                case 'start':
+                    if( args.length > 2 ){
+                        var anims = args[2].replace(/\./g,':').split(':');
+                        var selection = anims.length > 1 ? anims[ Math.floor( Math.random() * anims.length ) ] : anims[0];
+                        var name = KunSceneManager.getAlias(args[1]);
+                        KunSceneManager.overrideSet( name , selection , true );
+                    }
+                    break;
+                case 'set':
+                    if( args.length > 2 ){
+                        var anims = args[2].replace(/\./g,':').split(':');
+                        var selection = anims.length > 1 ? anims[ Math.floor( Math.random() * anims.length ) ] : anims[0];
+                        var name = KunSceneManager.getAlias(args[1]);
+                        var start = args.length > 3 && args[3] === 'start';
+                        KunSceneManager.overrideSet( name , selection , start );
+
+                        if( args.length > 3 ){
+                            if( args[3] === 'wait'){
+                                if ( args.length > 4 ){
+                                    var wait = args[4].split(':').map( count => parseInt(count));
+                                    this.wait( wait.length > 1 ? wait[0] + Math.floor( Math.random() * ( wait[1] - wait[0] ) ) : wait[0] );
+                                }
+                            }
+                        }
+                    }
+                    break;
+                case 'randomize':
+                    if( args.length > 1 ){
+                        var name = KunSceneManager.getAlias(args[1]);
+                        KunSceneManager.randomTarget( name );
+                    }
+                    break;
+                case 'pause':
+                    if( args.length > 1 ){
+                        KunSceneManager.stop( KunSceneManager.getAlias(args[1]) );
+                        //KunSceneManager.DebugLog('Animation Paused');
+                    }
+                    break;
+                case 'resume':
+                    if( args.length > 1 ){
+                        KunSceneManager.resume( KunSceneManager.getAlias(args[1]) );
+                        //KunSceneManager.DebugLog('Animation Resumed');
+                    }
+                    break;
+                case 'wait':
+                    if( args.length > 1 ){
+                        var wait = parseInt(args[1]);
+                        if( args.length > 2 && args[2] === 'import' && wait > 0 ){
+                            wait = $gameVariables.value( wait );
+                        }
+                        this.wait( wait );
+                        KunSceneManager.DebugLog(`Waiting ${wait} fps ...`);
+                    }
+                    break;
+                case 'target':
+                    KunSceneManager.target(args.length > 1 && args[1] === 'random');
+                    break;
+                case 'interruption':
+                    if( args.length > 1 ){
+                        KunSceneManager.stopInterruption( args[1].toLowerCase() === 'on' );
+                    }
+                    else{
+                        KunSceneManager.stopInterruption( false );
+                    }
+                    break;
+                case 'mode':
+                    KunSceneManager.setMode( args.length > 1  ? args[1] : KunSceneManager.Mode().Disabled );
+                    if( KunSceneManager.canCapture() ){
+                        KunSceneManager.DebugLog(`Capture Mode ON. Click and drag over a picture spot, then release to define the target area.`);
+                    }
+                    else{
+                        KunSceneManager.DebugLog(`${KunSceneManager.mode()} mode on`);
+                    }
+                    break;
+                case 'list':
+                    KunSceneManager.list();
+                    break;
+            }
+        }
+    };
+
+}
+
+/********************************************************************************************************************
+ * 
+ * INITIALIZER
+ * 
+ *******************************************************************************************************************/
+
+ (function( /* args */ ){
+
+    KunSceneManager.Initialize();
+
+    KunAnimations_RegisterManagers();
+
+    KunAnimations_SetupCommands();
+})( /* initializer */ );
+
+
+
